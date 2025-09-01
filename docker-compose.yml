@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  meeting-app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-your-api-key-here}
+    volumes:
+      # Mount local directories for whisper.cpp and output
+      - ${WHISPER_CPP_PATH:-/path/to/whisper.cpp}:/whisper_cpp:ro
+      - ${CALLS_OUTPUT_PATH:-./calls}:/app/calls
+      # Optional: mount configuration
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: Add nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl:ro
+    depends_on:
+      - meeting-app
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  calls_data:
+    driver: local

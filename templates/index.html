@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalScribe - Smart Meeting Transcription</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span class="app-icon">🎙️📝</span> LocalScribe</h1>
+        </header>
+        
+        <main>
+            <div class="recording-section">
+                <div class="meeting-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="meeting-name">Meeting Name:</label>
+                            <input type="text" id="meeting-name" placeholder="Enter meeting name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="audio-device">Audio Source:</label>
+                            <select id="audio-device" class="device-select">
+                                <option value="-1">Loading devices...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="prompt-type">Summary Type:</label>
+                            <select id="prompt-type" class="device-select">
+                                <option value="meeting">Executive Meeting</option>
+                                <option value="technical">Technical Review</option>
+                                <option value="sales">Sales Call</option>
+                                <option value="standup">Daily Standup</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="start-recording" class="btn btn-primary">
+                            <span class="icon">🎤</span>
+                            Start Recording
+                        </button>
+                        
+                        <button id="stop-recording" class="btn btn-danger" disabled>
+                            <span class="icon">⏹️</span>
+                            Stop Recording
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="status-section">
+                    <div id="status" class="status-idle">Ready to record</div>
+                    <div id="progress-bar" class="progress-bar hidden">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="transcription-section">
+                <h2>Live Transcription</h2>
+                <div id="transcription-display" class="transcription-display">
+                    <p class="placeholder-text">Transcription will appear here when recording starts...</p>
+                </div>
+                <div class="transcription-controls">
+                    <button id="clear-transcription" class="btn btn-secondary" disabled>
+                        🗑️ Clear Text
+                    </button>
+                    <button id="copy-transcription" class="btn btn-secondary" disabled>
+                        📋 Copy Text
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
