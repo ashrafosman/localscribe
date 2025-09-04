@@ -1,6 +1,9 @@
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_socketio import SocketIO, emit
 import os
+import socket
+import signal
+import sys
 from pathlib import Path
 import mimetypes
 from config import config, Config
@@ -12,6 +15,32 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Initialize meeting service
 meeting_service = MeetingService()
+
+def is_port_available(port):
+    """Check if a port is available"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('localhost', port))
+            return True
+        except socket.error:
+            return False
+
+def find_available_port(start_port=5001, max_attempts=10):
+    """Find an available port starting from start_port"""
+    for port in range(start_port, start_port + max_attempts):
+        if is_port_available(port):
+            return port
+    raise Exception(f"No available port found in range {start_port}-{start_port + max_attempts - 1}")
+
+def cleanup_and_exit(signum=None, frame=None):
+    """Cleanup resources and exit gracefully"""
+    print("\nShutting down gracefully...")
+    try:
+        meeting_service.cleanup_all_meetings()
+        print("Cleanup completed.")
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+    sys.exit(0)
 
 @app.route('/')
 def index():
@@ -54,6 +83,7 @@ def start_recording():
         def status_callback(meeting_id, status, message):
             if status == 'transcription':
                 # Stream transcription text in real-time
+                print(f"Sending transcription via WebSocket: '{message}'")  # Debug
                 socketio.emit('meeting_status', {
                     'type': 'transcription',
                     'meeting_id': meeting_id,
@@ -61,6 +91,7 @@ def start_recording():
                 })
             else:
                 # Regular status updates
+                print(f"Sending status update: {status} - {message}")  # Debug
                 socketio.emit('meeting_status', {
                     'type': 'status',
                     'meeting_id': meeting_id,
@@ -203,6 +234,10 @@ def before_first_request():
         app._initialized = True
 
 if __name__ == '__main__':
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, cleanup_and_exit)
+    signal.signal(signal.SIGTERM, cleanup_and_exit)
+    
     # Validate configuration on startup
     errors = Config.validate_paths()
     if errors:
@@ -216,10 +251,30 @@ if __name__ == '__main__':
     print(f"Whisper.cpp path: {Config.WHISPER_CPP_PATH}")
     print(f"Output directory: {Config.CALLS_OUTPUT_PATH}")
     
-    socketio.run(
-        app,
-        host='0.0.0.0',
-        port=5000,
-        debug=app.config['DEBUG'],
-        allow_unsafe_werkzeug=True
-    )
+    # Find an available port
+    try:
+        requested_port = int(os.environ.get('PORT', 5001))
+        if is_port_available(requested_port):
+            port = requested_port
+        else:
+            port = find_available_port(requested_port)
+            print(f"Port {requested_port} is not available, using port {port} instead")
+    except Exception as e:
+        print(f"Error finding available port: {e}")
+        exit(1)
+    
+    print(f"Server starting on port {port}")
+    
+    try:
+        socketio.run(
+            app,
+            host='0.0.0.0',
+            port=port,
+            debug=app.config['DEBUG'],
+            allow_unsafe_werkzeug=True
+        )
+    except KeyboardInterrupt:
+        cleanup_and_exit()
+    except Exception as e:
+        print(f"Server error: {e}")
+        cleanup_and_exit()

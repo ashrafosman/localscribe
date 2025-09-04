@@ -219,18 +219,31 @@ class MeetingService:
             self._notify_callbacks(meeting_id, 'recording', 'Recording started')
             
             # Change to whisper.cpp directory
+            original_cwd = os.getcwd()
             os.chdir(self.config.WHISPER_CPP_PATH)
             
-            # Build whisper.cpp command
+            # Build whisper.cpp command - simplified to match working version
             cmd = [
                 './stream',
-                '-m', str(self.config.WHISPER_MODEL_PATH),
-                '-t', str(self.config.WHISPER_THREADS),
-                '-kc',
-                '-tdrz',
-                '-c', str(meeting['audio_device_id']),
-                '-f', meeting['transcript_filename']
+                '-m', str(self.config.WHISPER_MODEL_PATH)
             ]
+            
+            # Add optional parameters that work reliably
+            if self.config.WHISPER_THREADS != 4:  # Only add if different from default
+                cmd.extend(['-t', str(self.config.WHISPER_THREADS)])
+                
+            # Don't use -kc and -tdrz together as they might conflict
+            
+            # Only add capture device if not default (-1)
+            if meeting['audio_device_id'] != -1:
+                cmd.extend(['-c', str(meeting['audio_device_id'])])
+                print(f"Using audio device #{meeting['audio_device_id']}")
+            else:
+                print("Using default audio device")
+            
+            cmd.extend(['-f', meeting['transcript_filename']])
+            
+            print(f"Running whisper.cpp command: {' '.join(cmd)}")
             
             # Start the whisper.cpp process
             meeting['process'] = subprocess.Popen(
@@ -266,6 +279,12 @@ class MeetingService:
             self._notify_callbacks(meeting_id, 'error', f'Recording error: {str(e)}')
         
         finally:
+            # Restore working directory
+            try:
+                os.chdir(original_cwd)
+            except:
+                pass
+            
             # Clean up
             if meeting_id in self.active_recordings:
                 if meeting['status'] != 'complete':
@@ -276,32 +295,113 @@ class MeetingService:
         meeting = self.active_recordings[meeting_id]
         process = meeting['process']
         
+        import threading
+        import queue
+        
+        def read_output(stream, output_queue, stream_name):
+            """Read from a stream and put lines in queue"""
+            try:
+                while True:
+                    line = stream.readline()
+                    if not line:
+                        break
+                    output_queue.put((stream_name, line.strip()))
+            except Exception as e:
+                print(f"Error reading {stream_name}: {e}")
+        
         try:
-            # Read stdout line by line in real-time
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
+            # Create queue for output
+            output_queue = queue.Queue()
+            
+            # Start threads to read both stdout and stderr
+            stdout_thread = threading.Thread(target=read_output, args=(process.stdout, output_queue, 'stdout'))
+            stderr_thread = threading.Thread(target=read_output, args=(process.stderr, output_queue, 'stderr'))
+            
+            stdout_thread.daemon = True
+            stderr_thread.daemon = True
+            
+            stdout_thread.start()
+            stderr_thread.start()
+            
+            # Process output from both streams
+            while process.poll() is None or not output_queue.empty():
+                try:
+                    stream_name, line = output_queue.get(timeout=1)
+                    
+                    if line:
+                        # Remove ANSI escape sequences
+                        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                        clean_line = ansi_escape.sub('', line)
+                        
+                        # Remove other common terminal control sequences
+                        clean_line = clean_line.replace('[2K', '').strip()
+                        
+                        # Only log non-empty raw output for debugging
+                        if clean_line:
+                            print(f"Raw output ({stream_name}): '{clean_line}'")  # Debug all output
+                        
+                        # Filter out system messages and only send actual transcription
+                        # Skip system messages, but allow transcribed text
+                        skip_patterns = [
+                            'whisper_init_from_file',
+                            'whisper_init_with_params',
+                            'whisper_model_load',
+                            'whisper_backend_init',
+                            'ggml_metal_init',
+                            'whisper_init_state',
+                            'main: processing',
+                            'main: n_new_line',
+                            '[ Silence ]',
+                            '[BLANK_AUDIO]',
+                            '[Start speaking]',
+                            'init:',
+                            'whisper_print_timings',
+                            'found ',
+                            'attempt to open',
+                            'obtained spec',
+                            'sample rate:',
+                            'format:',
+                            'channels:',
+                            'samples per frame:'
+                        ]
+                        
+                        should_skip = any(pattern in clean_line for pattern in skip_patterns)
+                        
+                        # Additional filtering for meaningful transcription
+                        is_meaningful = (
+                            clean_line and 
+                            not should_skip and 
+                            clean_line.strip() and 
+                            not clean_line.isspace() and
+                            clean_line != '.' and  # Skip standalone periods
+                            clean_line != '..' and  # Skip multiple periods
+                            clean_line != '...' and  # Skip ellipsis
+                            len(clean_line.strip()) > 1 and  # Must be more than 1 character
+                            not clean_line.strip().replace('.', '').strip() == ''  # Not just periods
+                        )
+                        
+                        if is_meaningful:
+                            # Check for duplicates by storing last sent transcription in the dict
+                            last_transcription = meeting.get('_last_transcription', '')
+                            if last_transcription != clean_line:
+                                print(f"Transcription output: '{clean_line}'")  # Debug output
+                                meeting['_last_transcription'] = clean_line
+                                
+                                # Send cleaned transcription text via callback
+                                for callback in meeting.get('callbacks', []):
+                                    try:
+                                        callback(meeting_id, 'transcription', clean_line)
+                                    except Exception as e:
+                                        print(f"Transcription callback error: {e}")
+                            else:
+                                print(f"Skipping duplicate transcription: '{clean_line}'")
+                    
+                except queue.Empty:
+                    continue
+                except Exception as e:
+                    print(f"Queue processing error: {e}")
                     break
-                
-                if output:
-                    line = output.strip()
-                    
-                    # Remove ANSI escape sequences
-                    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                    clean_line = ansi_escape.sub('', line)
-                    
-                    # Remove other common terminal control sequences
-                    clean_line = clean_line.replace('[2K', '').strip()
-                    
-                    # Filter out system messages and only send actual transcription
-                    if clean_line and not clean_line.startswith('[') and not clean_line.startswith('whisper.cpp'):
-                        # Send cleaned transcription text via callback
-                        for callback in meeting.get('callbacks', []):
-                            try:
-                                callback(meeting_id, 'transcription', clean_line)
-                            except Exception as e:
-                                print(f"Transcription callback error: {e}")
-                
+            
         except Exception as e:
             print(f"Streaming error: {e}")
     
@@ -469,3 +569,29 @@ class MeetingService:
         
         for meeting_id in to_remove:
             del self.active_recordings[meeting_id]
+    
+    def cleanup_all_meetings(self):
+        """Clean up all active meetings and processes"""
+        for meeting_id, meeting in list(self.active_recordings.items()):
+            try:
+                # Stop any running processes
+                if meeting.get('process') and meeting['process'].poll() is None:
+                    print(f"Stopping recording process for meeting {meeting_id}")
+                    try:
+                        meeting['process'].send_signal(signal.SIGINT)
+                        meeting['process'].wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        meeting['process'].kill()
+                        meeting['process'].wait()
+                    except Exception as e:
+                        print(f"Error stopping process for meeting {meeting_id}: {e}")
+                
+                # Update status
+                if meeting['status'] in ['recording', 'processing']:
+                    meeting['status'] = 'interrupted'
+                
+            except Exception as e:
+                print(f"Error cleaning up meeting {meeting_id}: {e}")
+        
+        # Clear all recordings
+        self.active_recordings.clear()
