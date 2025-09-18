@@ -35,4 +35,4 @@ logs/
 # Output files
 calls/
 *.txt
-*.txt-summarized.txt
+*.txt-summarized.txtwhisper/whisper.cpp/

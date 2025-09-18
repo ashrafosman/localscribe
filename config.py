@@ -13,11 +13,12 @@ class Config:
     # Paths configuration
     BASE_DIR = Path(__file__).parent.parent
     VENV_PATH = BASE_DIR / 'venv'
-    WHISPER_CPP_PATH = Path.home() / 'Documents' / 'Work' / 'whisper.cpp'
-    CALLS_OUTPUT_PATH = Path.home() / 'Documents' / 'Work' / 'calls'
+    WHISPER_CPP_PATH = Path(os.environ.get('WHISPER_CPP_PATH', Path.home() / 'Documents' / 'Work' / 'whisper.cpp'))
+    CALLS_OUTPUT_PATH = Path(os.environ.get('CALLS_OUTPUT_PATH', Path.home() / 'Documents' / 'Work' / 'calls'))
     
-    # Whisper.cpp configuration
-    WHISPER_MODEL_PATH = WHISPER_CPP_PATH / 'models' / 'ggml-small.en-tdrz.bin'
+    # Whisper.cpp configuration  
+    WHISPER_STREAM_PATH = WHISPER_CPP_PATH / 'stream'
+    WHISPER_MODEL_PATH = Path('/Users/ashraf.osman/Documents/Work/whisper.cpp/models/ggml-small.en-tdrz.bin')
     WHISPER_THREADS = int(os.environ.get('WHISPER_THREADS', '8'))
     
     # API Keys
@@ -38,6 +39,9 @@ class Config:
         
         if not cls.WHISPER_CPP_PATH.exists():
             errors.append(f"Whisper.cpp path not found: {cls.WHISPER_CPP_PATH}")
+        
+        if not cls.WHISPER_STREAM_PATH.exists():
+            errors.append(f"Whisper stream executable not found: {cls.WHISPER_STREAM_PATH}")
         
         if not cls.WHISPER_MODEL_PATH.exists():
             errors.append(f"Whisper model not found: {cls.WHISPER_MODEL_PATH}")

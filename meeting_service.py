@@ -23,12 +23,8 @@ class MeetingService:
             return self.audio_devices
             
         try:
-            # Change to whisper.cpp directory
-            original_cwd = os.getcwd()
-            os.chdir(self.config.WHISPER_CPP_PATH)
-            
             # Run stream with invalid capture device to get device list
-            cmd = ['./stream', '-c', '-2']  # Invalid device ID to trigger device listing
+            cmd = [str(self.config.WHISPER_STREAM_PATH), '-c', '-2']  # Invalid device ID to trigger device listing
             
             process = subprocess.Popen(
                 cmd,
@@ -60,19 +56,30 @@ class MeetingService:
                             'name': device_name
                         })
             
-            # Add default device option
-            devices.insert(0, {'id': -1, 'name': 'Default Device'})
+            # Add system default as the first option (easiest to use)
+            final_devices = [{'id': -1, 'name': 'System Default'}]
             
-            self.audio_devices = devices
-            return devices
+            # Find and label special devices
+            other_devices = []
+            for device in devices:
+                if 'blackhole' in device['name'].lower():
+                    device['name'] = f"{device['name']} (System Audio + Mic - Requires Setup)"
+                elif 'aggregate' in device['name'].lower():
+                    device['name'] = f"{device['name']} (Multi-Input - May Capture Both)"
+                other_devices.append(device)
             
+            # Add all other devices after system default
+            final_devices.extend(other_devices)
+            
+            self.audio_devices = final_devices
+            return final_devices
         except Exception as e:
             print(f"Error getting audio devices: {e}")
             # Return default device as fallback
             return [{'id': -1, 'name': 'Default Device'}]
             
         finally:
-            os.chdir(original_cwd)
+            pass  # No directory change cleanup needed
     
     def get_available_prompts(self):
         """Get list of available summarization prompts"""
@@ -218,33 +225,27 @@ class MeetingService:
             meeting['status'] = 'recording'
             self._notify_callbacks(meeting_id, 'recording', 'Recording started')
             
-            # Change to whisper.cpp directory
-            original_cwd = os.getcwd()
-            os.chdir(self.config.WHISPER_CPP_PATH)
-            
-            # Build whisper.cpp command - simplified to match working version
+            # Build whisper.cpp command - match the working implementation exactly
             cmd = [
-                './stream',
-                '-m', str(self.config.WHISPER_MODEL_PATH)
+                str(self.config.WHISPER_STREAM_PATH),
+                '-m', str(self.config.WHISPER_MODEL_PATH),
+                '-t', str(self.config.WHISPER_THREADS),
+                '-kc',
+                '-tdrz'  # This was missing! Critical for transcription quality
             ]
-            
-            # Add optional parameters that work reliably
-            if self.config.WHISPER_THREADS != 4:  # Only add if different from default
-                cmd.extend(['-t', str(self.config.WHISPER_THREADS)])
-                
-            # Don't use -kc and -tdrz together as they might conflict
-            
-            # Only add capture device if not default (-1)
+
+            # Only add capture device if not using system default (-1)
+            # When device_id is -1, we let whisper.cpp choose its own default
+            # This matches the working implementation behavior
             if meeting['audio_device_id'] != -1:
                 cmd.extend(['-c', str(meeting['audio_device_id'])])
-                print(f"Using audio device #{meeting['audio_device_id']}")
-            else:
-                print("Using default audio device")
+            # When no -c flag is provided, whisper.cpp uses its own default device selection
             
             cmd.extend(['-f', meeting['transcript_filename']])
+            # Removed debug command output for clean CLI experience
             
-            print(f"Running whisper.cpp command: {' '.join(cmd)}")
-            
+            # Debug: print the command
+            print(f"Running command: {' '.join(cmd)}")
             # Start the whisper.cpp process
             meeting['process'] = subprocess.Popen(
                 cmd,
@@ -279,11 +280,13 @@ class MeetingService:
             self._notify_callbacks(meeting_id, 'error', f'Recording error: {str(e)}')
         
         finally:
-            # Restore working directory
-            try:
-                os.chdir(original_cwd)
-            except:
-                pass
+            # Clean up process if it's still running
+            if 'process' in locals() and meeting['process'] and meeting['process'].poll() is None:
+                try:
+                    meeting['process'].terminate()
+                    meeting['process'].wait(timeout=5)
+                except:
+                    pass
             
             # Clean up
             if meeting_id in self.active_recordings:
@@ -336,9 +339,7 @@ class MeetingService:
                         # Remove other common terminal control sequences
                         clean_line = clean_line.replace('[2K', '').strip()
                         
-                        # Only log non-empty raw output for debugging
-                        if clean_line:
-                            print(f"Raw output ({stream_name}): '{clean_line}'")  # Debug all output
+                        # Removed raw output logging for clean CLI experience
                         
                         # Filter out system messages and only send actual transcription
                         # Skip system messages, but allow transcribed text
@@ -384,7 +385,6 @@ class MeetingService:
                             # Check for duplicates by storing last sent transcription in the dict
                             last_transcription = meeting.get('_last_transcription', '')
                             if last_transcription != clean_line:
-                                print(f"Transcription output: '{clean_line}'")  # Debug output
                                 meeting['_last_transcription'] = clean_line
                                 
                                 # Send cleaned transcription text via callback
@@ -392,9 +392,8 @@ class MeetingService:
                                     try:
                                         callback(meeting_id, 'transcription', clean_line)
                                     except Exception as e:
-                                        print(f"Transcription callback error: {e}")
-                            else:
-                                print(f"Skipping duplicate transcription: '{clean_line}'")
+                                        # Only show critical errors, not debug info
+                                        pass
                     
                 except queue.Empty:
                     continue
