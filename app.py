@@ -83,7 +83,6 @@ def start_recording():
         def status_callback(meeting_id, status, message):
             if status == 'transcription':
                 # Stream transcription text in real-time
-                print(f"Sending transcription via WebSocket: '{message}'")  # Debug
                 socketio.emit('meeting_status', {
                     'type': 'transcription',
                     'meeting_id': meeting_id,
@@ -91,7 +90,6 @@ def start_recording():
                 })
             else:
                 # Regular status updates
-                print(f"Sending status update: {status} - {message}")  # Debug
                 socketio.emit('meeting_status', {
                     'type': 'status',
                     'meeting_id': meeting_id,

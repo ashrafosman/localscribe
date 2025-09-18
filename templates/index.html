@@ -13,66 +13,74 @@
         </header>
         
         <main>
-            <div class="recording-section">
-                <div class="meeting-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="meeting-name">Meeting Name:</label>
-                            <input type="text" id="meeting-name" placeholder="Enter meeting name" required>
+            <div class="info-section">
+                <div class="info-card">
+                    <h2>🎙️ CLI Recording Mode</h2>
+                    <p>LocalScribe now uses CLI mode for reliable audio capture, including both speakers and microphone!</p>
+                    
+                    <div class="cli-instructions">
+                        <h3>How to Record:</h3>
+                        <div class="instruction-step">
+                            <span class="step-number">1</span>
+                            <div class="step-content">
+                                <strong>Open Terminal</strong>
+                                <p>Navigate to your LocalScribe folder</p>
+                            </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="audio-device">Audio Source:</label>
-                            <select id="audio-device" class="device-select">
-                                <option value="-1">Loading devices...</option>
-                            </select>
+                        <div class="instruction-step">
+                            <span class="step-number">2</span>
+                            <div class="step-content">
+                                <strong>Start Recording</strong>
+                                <div class="code-block">
+                                    <code>python record_cli.py --record</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --record')">📋</button>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="prompt-type">Summary Type:</label>
-                            <select id="prompt-type" class="device-select">
-                                <option value="meeting">Executive Meeting</option>
-                                <option value="technical">Technical Review</option>
-                                <option value="sales">Sales Call</option>
-                                <option value="standup">Daily Standup</option>
-                            </select>
+                        <div class="instruction-step">
+                            <span class="step-number">3</span>
+                            <div class="step-content">
+                                <strong>Follow the prompts</strong>
+                                <p>Enter meeting name, select audio device, and start speaking!</p>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="button-group">
-                        <button id="start-recording" class="btn btn-primary">
-                            <span class="icon">🎤</span>
-                            Start Recording
-                        </button>
-                        
-                        <button id="stop-recording" class="btn btn-danger" disabled>
-                            <span class="icon">⏹️</span>
-                            Stop Recording
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="status-section">
-                    <div id="status" class="status-idle">Ready to record</div>
-                    <div id="progress-bar" class="progress-bar hidden">
-                        <div class="progress-fill"></div>
+                    <div class="quick-commands">
+                        <h3>Quick Commands:</h3>
+                        <div class="command-grid">
+                            <div class="command-item">
+                                <code>python record_cli.py --list-devices</code>
+                                <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --list-devices')">📋</button>
+                                <span class="command-desc">List audio devices</span>
+                            </div>
+                            
+                            <div class="command-item">
+                                <code>python record_cli.py --list-recordings</code>
+                                <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --list-recordings')">📋</button>
+                                <span class="command-desc">View past recordings</span>
+                            </div>
+                            
+                            <div class="command-item">
+                                <code>python record_cli.py --meeting-name "My Meeting"</code>
+                                <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --meeting-name \"My Meeting\"')">📋</button>
+                                <span class="command-desc">Quick start recording</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div class="transcription-section">
-                <h2>Live Transcription</h2>
-                <div id="transcription-display" class="transcription-display">
-                    <p class="placeholder-text">Transcription will appear here when recording starts...</p>
+            <div class="recordings-section">
+                <h2>📁 Recent Recordings</h2>
+                <div id="recordings-list" class="recordings-list">
+                    <p class="loading-text">Loading recordings...</p>
                 </div>
-                <div class="transcription-controls">
-                    <button id="clear-transcription" class="btn btn-secondary" disabled>
-                        🗑️ Clear Text
-                    </button>
-                    <button id="copy-transcription" class="btn btn-secondary" disabled>
-                        📋 Copy Text
-                    </button>
-                </div>
+                <button id="refresh-recordings" class="btn btn-secondary">
+                    🔄 Refresh
+                </button>
             </div>
         </main>
     </div>

@@ -28,6 +28,221 @@ header h1 {
     color: #1d1d1f;
 }
 
+.info-section {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.info-card h2 {
+    color: #007AFF;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cli-instructions {
+    margin: 30px 0;
+}
+
+.cli-instructions h3 {
+    color: #1d1d1f;
+    margin-bottom: 20px;
+    font-size: 1.3em;
+}
+
+.instruction-step {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.step-number {
+    background: #007AFF;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-content strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #1d1d1f;
+    font-size: 1.1em;
+}
+
+.code-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 12px;
+    background: #2d2d2d;
+    border-radius: 6px;
+    color: #f8f8f2;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+.code-block code {
+    flex: 1;
+    background: none;
+    color: inherit;
+    font-size: 14px;
+}
+
+.copy-btn {
+    background: #007AFF;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+    background: #0056CC;
+}
+
+.quick-commands {
+    margin-top: 30px;
+}
+
+.quick-commands h3 {
+    color: #1d1d1f;
+    margin-bottom: 20px;
+    font-size: 1.3em;
+}
+
+.command-grid {
+    display: grid;
+    gap: 15px;
+}
+
+.command-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007AFF;
+}
+
+.command-item code {
+    flex: 1;
+    background: #2d2d2d;
+    color: #f8f8f2;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 13px;
+}
+
+.command-desc {
+    color: #666;
+    font-size: 12px;
+    min-width: 120px;
+}
+
+.recordings-section {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.recordings-section h2 {
+    color: #1d1d1f;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.recordings-list {
+    margin-bottom: 20px;
+}
+
+.recording-item {
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    background: #fafafa;
+}
+
+.recording-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.recording-header h3 {
+    color: #1d1d1f;
+    margin: 0;
+    flex: 1;
+}
+
+.recording-date {
+    color: #666;
+    font-size: 14px;
+    margin: 0 15px;
+}
+
+.recording-size {
+    color: #999;
+    font-size: 12px;
+    background: #e0e0e0;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.recording-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.no-recordings {
+    text-align: center;
+    color: #666;
+    padding: 40px;
+    font-style: italic;
+}
+
+.loading-text {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+}
+
+.error-text {
+    text-align: center;
+    color: #ff3b30;
+    padding: 20px;
+}
+
 .recording-section {
     background: white;
     border-radius: 12px;
