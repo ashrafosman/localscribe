@@ -13,6 +13,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
+import json
 from config import Config
 from meeting_service import MeetingService
 import argparse
@@ -22,6 +23,31 @@ class LocalScribeCLI:
         self.meeting_service = MeetingService()
         self.current_recording = None
         self.is_recording = False
+        # Persist last selections under user home
+        self.state_dir = Path.home() / '.localscribe'
+        self.state_file = self.state_dir / 'state.json'
+
+    def _load_last_selection(self):
+        try:
+            if self.state_file.exists():
+                with open(self.state_file, 'r') as f:
+                    data = json.load(f)
+                    return {
+                        'device_id': data.get('device_id', -1),
+                        'prompt_type': data.get('prompt_type', 'meeting')
+                    }
+        except Exception:
+            pass
+        return {'device_id': -1, 'prompt_type': 'meeting'}
+
+    def _save_last_selection(self, device_id, prompt_type):
+        try:
+            self.state_dir.mkdir(parents=True, exist_ok=True)
+            with open(self.state_file, 'w') as f:
+                json.dump({'device_id': device_id, 'prompt_type': prompt_type}, f)
+        except Exception:
+            # Non-fatal if we can't persist
+            pass
         
     def list_audio_devices(self):
         """List available audio devices"""
@@ -77,12 +103,21 @@ class LocalScribeCLI:
             print("No audio devices found!")
             return
         
+        # Determine default device index from last selection
+        last = self._load_last_selection()
+        last_device_id = last.get('device_id', -1)
+        default_device_idx = 0
+        for idx, d in enumerate(devices):
+            if d['id'] == last_device_id:
+                default_device_idx = idx
+                break
+
         while True:
             try:
-                device_input = input(f"Select audio device (0-{len(devices)-1}, default=0): ").strip()
+                device_input = input(f"Select audio device (0-{len(devices)-1}, default={default_device_idx}): ").strip()
                 if not device_input:
-                    device_idx = 0
-                    device_id = devices[0]['id']
+                    device_idx = default_device_idx
+                    device_id = devices[device_idx]['id']
                     break
                 else:
                     device_idx = int(device_input)
@@ -99,12 +134,19 @@ class LocalScribeCLI:
         # Show and select prompt type
         prompts = self.list_prompts()
         if prompts:
+            # Determine default prompt index from last selection
+            last_prompt = last.get('prompt_type', 'meeting')
+            default_prompt_idx = 0
+            for idx, p in enumerate(prompts):
+                if p['id'] == last_prompt:
+                    default_prompt_idx = idx
+                    break
             while True:
                 try:
-                    prompt_input = input(f"Select summary type (0-{len(prompts)-1}, default=0): ").strip()
+                    prompt_input = input(f"Select summary type (0-{len(prompts)-1}, default={default_prompt_idx}): ").strip()
                     if not prompt_input:
-                        prompt_idx = 0
-                        prompt_type = prompts[0]['id']
+                        prompt_idx = default_prompt_idx
+                        prompt_type = prompts[prompt_idx]['id']
                         break
                     else:
                         prompt_idx = int(prompt_input)
@@ -121,6 +163,48 @@ class LocalScribeCLI:
             prompt_type = 'meeting'
         
         # Start recording
+        self.start_recording(meeting_name, device_id, prompt_type)
+
+    def quick_record_prompt(self, meeting_name: str | None = None):
+        """Non-interactive quick start: use last saved device and prompt.
+        Optionally takes a meeting_name to override the auto-generated one.
+        """
+        print("⚡ Quick Record (no prompts)")
+        print("=" * 50)
+
+        # Meeting name: Quick-YYYYMMDD-HHMMSS (no prompt) for uniqueness, unless provided
+        meeting_name = meeting_name or datetime.now().strftime("Quick-%Y%m%d-%H%M%S")
+
+        # Load last selections
+        last = self._load_last_selection()
+
+        # Resolve device: prefer last saved device_id, else fallback to first available
+        devices = self.meeting_service.get_audio_devices()
+        if not devices:
+            print("No audio devices found!")
+            return
+
+        # Map device_id -> device and index
+        device_id = None
+        device_name = None
+        for d in devices:
+            if d['id'] == last.get('device_id', -1):
+                device_id = d['id']
+                device_name = d['name']
+                break
+        if device_id is None:
+            # Fallback to first device
+            device_id = devices[0]['id']
+            device_name = devices[0]['name']
+
+        # Resolve prompt type: prefer last saved, else default 'meeting'
+        prompt_type = last.get('prompt_type', 'meeting') or 'meeting'
+
+        print(f"📱 Using device: {device_name} (id={device_id})")
+        print(f"📋 Using template: {prompt_type}")
+        print(f"🧾 Meeting name: {meeting_name}")
+
+        # Start recording immediately
         self.start_recording(meeting_name, device_id, prompt_type)
     
     def start_recording(self, meeting_name, device_id=-1, prompt_type='meeting'):
@@ -145,6 +229,8 @@ class LocalScribeCLI:
             self.current_recording = self.meeting_service.start_recording(
                 meeting_name, device_id, prompt_type
             )
+            # Persist last-used selections
+            self._save_last_selection(device_id, prompt_type)
             self.meeting_service.add_status_callback(self.current_recording, status_callback)
             self.is_recording = True
             
@@ -267,7 +353,8 @@ def main():
     parser.add_argument('--list-recordings', action='store_true', help='List recorded meetings')
     parser.add_argument('--record', action='store_true', help='Start interactive recording')
     parser.add_argument('--setup-audio', action='store_true', help='Show audio setup instructions')
-    parser.add_argument('--meeting-name', type=str, help='Meeting name for recording')
+    parser.add_argument('--quick', '-q', action='store_true', help='Quick start: use last mic and template (no prompts)')
+    parser.add_argument('--meeting-name', '--name', '-n', type=str, help='Meeting name for recording')
     parser.add_argument('--device-id', type=int, default=-1, help='Audio device ID')
     parser.add_argument('--prompt-type', type=str, default='meeting', help='Summary prompt type')
     
@@ -295,6 +382,9 @@ def main():
         cli.show_audio_setup()
     elif args.record:
         cli.start_interactive_recording()
+    elif args.quick:
+        # Allow combining --quick with --name/-n to set a custom title
+        cli.quick_record_prompt(args.meeting_name)
     elif args.meeting_name:
         # Direct recording with specified parameters
         cli.start_recording(args.meeting_name, args.device_id, args.prompt_type)
@@ -304,10 +394,13 @@ def main():
         print("=" * 50)
         print("Usage options:")
         print("  python record_cli.py --record              # Interactive recording")
+        print("  python record_cli.py --quick               # Quick start (last mic + template)")
         print("  python record_cli.py --setup-audio         # Audio setup guide")
         print("  python record_cli.py --list-devices        # List audio devices")
         print("  python record_cli.py --list-recordings     # Show past recordings")
         print("  python record_cli.py --meeting-name 'Meeting Name'  # Quick recording")
+        print("  python record_cli.py --name 'Meeting Name'         # Same as --meeting-name")
+        print("  python record_cli.py --quick --name 'Title'        # Quick with custom name")
         print("")
         print("💡 First time? Run: python record_cli.py --setup-audio")
         print("")

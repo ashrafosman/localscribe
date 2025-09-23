@@ -148,8 +148,22 @@ class MeetingService:
         # Generate filenames with current date
         current_date = datetime.now().strftime("%Y-%m-%d")
         base_filename = f"{current_date}_{sanitized_name}"
-        transcript_filename = f"{base_filename}.txt"
-        summary_filename = f"{base_filename}.txt-summarized.txt"
+
+        # Ensure uniqueness to avoid overwrite prompts
+        def unique_name(base: str):
+            candidate_txt = f"{base}.txt"
+            candidate_sum = f"{base}.txt-summarized.txt"
+            if not Path(candidate_txt).exists() and not Path(candidate_sum).exists():
+                return candidate_txt, candidate_sum
+            i = 2
+            while True:
+                candidate_txt = f"{base}_{i}.txt"
+                candidate_sum = f"{base}_{i}.txt-summarized.txt"
+                if not Path(candidate_txt).exists() and not Path(candidate_sum).exists():
+                    return candidate_txt, candidate_sum
+                i += 1
+
+        transcript_filename, summary_filename = unique_name(base_filename)
         
         # Create meeting record
         meeting_record = {

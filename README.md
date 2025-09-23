@@ -54,6 +54,12 @@ A command-line application for recording meetings, transcribing audio, and gener
 
 3. **Stop recording**: Press `Ctrl+C` when done
 
+4. **Quick prompt (mic + template)**:
+   ```bash
+   python record_cli.py --quick
+   ```
+   This asks for meeting name (with a default), lets you pick microphone/device and meeting template, then starts recording immediately. It remembers your last-used mic and template.
+
 ### Managing Files (Optional)
 
 4. **Start web interface** (for file management):
@@ -113,6 +119,13 @@ A command-line application for recording meetings, transcribing audio, and gener
 ```bash
 python record_cli.py --record
 ```
+
+### Quick Prompt
+```bash
+python record_cli.py --quick
+```
+Prompts for mic/device and meeting template with a smart default meeting name.
+Remembers the last-used mic and template between runs.
 
 ### Additional Utilities
 ```bash
