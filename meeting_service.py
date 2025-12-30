@@ -491,6 +491,14 @@ class MeetingService:
             return response.json()["choices"][0]["message"]["content"]
         else:
             raise Exception(f"API Error: {response.status_code}, {response.text}")
+
+    def summarize_text(self, transcript_text, prompt_content):
+        """Summarize text with a custom prompt"""
+        if not transcript_text.strip():
+            raise ValueError("Transcript text is empty")
+        if not prompt_content.strip():
+            raise ValueError("Prompt content is empty")
+        return self._call_summarization_api(transcript_text, prompt_content)
     
     def _move_files(self, meeting_id):
         """Move transcript and summary files to output directory"""
@@ -527,9 +535,14 @@ class MeetingService:
         if not self.config.CALLS_OUTPUT_PATH.exists():
             return files
         
-        # Look for transcript files
+        # Look for transcript files (today only)
+        today = datetime.now().date()
         for transcript_file in self.config.CALLS_OUTPUT_PATH.glob("*.txt"):
             if transcript_file.name.endswith("-summarized.txt"):
+                continue
+
+            mtime = datetime.fromtimestamp(transcript_file.stat().st_mtime).date()
+            if mtime != today:
                 continue
                 
             # Extract meeting info from filename
@@ -547,6 +560,7 @@ class MeetingService:
             file_info = {
                 'name': name.replace('_', ' ').title(),
                 'date': date_str,
+                'mtime': transcript_file.stat().st_mtime,
                 'size': self._format_file_size(transcript_file.stat().st_size),
                 'transcript_path': str(transcript_file),
                 'summary_path': str(summary_file) if summary_file.exists() else None
@@ -554,8 +568,11 @@ class MeetingService:
             
             files.append(file_info)
         
-        # Sort by date (newest first)
-        files.sort(key=lambda x: x['date'], reverse=True)
+        # Sort by modification time (newest first)
+        files.sort(key=lambda x: x['mtime'], reverse=True)
+
+        for file_info in files:
+            file_info.pop('mtime', None)
         
         return files
     

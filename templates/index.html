@@ -7,90 +7,181 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1><span class="app-icon">🎙️📝</span> LocalScribe</h1>
-        </header>
-        
-        <main>
-            <div class="info-section">
-                <div class="info-card">
-                    <h2>🎙️ CLI Recording Mode</h2>
-                    <p>LocalScribe now uses CLI mode for reliable audio capture, including both speakers and microphone!</p>
-                    
-                    <div class="cli-instructions">
-                        <h3>How to Record:</h3>
-                        <div class="instruction-step">
-                            <span class="step-number">1</span>
-                            <div class="step-content">
-                                <strong>Open Terminal</strong>
-                                <p>Navigate to your LocalScribe folder</p>
-                            </div>
-                        </div>
-                        
-                        <div class="instruction-step">
-                            <span class="step-number">2</span>
-                            <div class="step-content">
-                                <strong>Start Recording</strong>
-                                <div class="code-block">
-                                    <code>python record_cli.py --record</code>
-                                    <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --record')">📋</button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="instruction-step">
-                            <span class="step-number">3</span>
-                            <div class="step-content">
-                                <strong>Follow the prompts</strong>
-                                <p>Enter meeting name, select audio device, and start speaking!</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="quick-commands">
-                        <h3>Quick Commands:</h3>
-                        <div class="command-grid">
-                            <div class="command-item">
-                                <code>python record_cli.py --quick</code>
-                                <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --quick')">📋</button>
-                                <span class="command-desc">Quick prompt (mic + template, remembers last)</span>
-                            </div>
+    <div class="ambient"></div>
 
-                            <div class="command-item">
-                                <code>python record_cli.py --list-devices</code>
-                                <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --list-devices')">📋</button>
-                                <span class="command-desc">List audio devices</span>
-                            </div>
-                            
-                            <div class="command-item">
-                                <code>python record_cli.py --list-recordings</code>
-                                <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --list-recordings')">📋</button>
-                                <span class="command-desc">View past recordings</span>
-                            </div>
-                            
-                            <div class="command-item">
-                                <code>python record_cli.py --meeting-name "My Meeting"</code>
-                                <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --meeting-name \"My Meeting\"')">📋</button>
-                                <span class="command-desc">Quick start recording</span>
-                            </div>
-                        </div>
-                    </div>
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">🎙️</span>
+            <div>
+                <h1>LocalScribe</h1>
+                <p>CLI-first recording with a focused studio-style UI</p>
+            </div>
+        </div>
+        <div class="topbar-meta">
+            <button id="open-settings" class="btn btn-ghost">Settings</button>
+        </div>
+    </header>
+
+    <section id="settings-panel" class="panel settings hidden">
+        <div class="panel-header">
+            <div>
+                <p class="panel-eyebrow">Settings</p>
+                <h2>Storage Paths</h2>
+            </div>
+            <button id="close-settings" class="btn btn-ghost btn-small">Close</button>
+        </div>
+        <div class="settings-grid">
+            <div class="form-field">
+                <label for="output-path">Transcripts folder</label>
+                <input id="output-path" type="text" placeholder="/Users/you/Documents/Meetings">
+                <p class="form-helper">Changes apply to new recordings and web downloads.</p>
+            </div>
+            <button id="save-settings" class="btn btn-primary">Save Settings</button>
+        </div>
+    </section>
+
+    <main class="layout">
+        <section class="panel session">
+            <div class="panel-header">
+                <div>
+                    <p class="panel-eyebrow">Session</p>
+                    <h2>Capture Control</h2>
+                </div>
+                <div id="status-pill" class="status-pill idle">Idle</div>
+            </div>
+            <div class="session-meta">
+                <div class="meta-item">
+                    <p class="meta-label">Meeting Name</p>
+                    <p id="meeting-name" class="meta-value">Not recording</p>
+                </div>
+                <div class="meta-item">
+                    <p class="meta-label">Elapsed</p>
+                    <p id="elapsed-time" class="meta-value">00:00:00</p>
                 </div>
             </div>
-            
-            <div class="recordings-section">
-                <h2>📁 Recent Recordings</h2>
-                <div id="recordings-list" class="recordings-list">
-                    <p class="loading-text">Loading recordings...</p>
+            <div class="session-form">
+                <div class="form-field">
+                    <label for="meeting-input">Meeting name</label>
+                    <input id="meeting-input" type="text" placeholder="Design Sync - Q3">
                 </div>
-                <button id="refresh-recordings" class="btn btn-secondary">
-                    🔄 Refresh
-                </button>
+                <div class="form-field">
+                    <label for="device-select">Audio device</label>
+                    <select id="device-select"></select>
+                </div>
+                <div class="form-field">
+                    <label for="prompt-select">Summary template</label>
+                    <select id="prompt-select"></select>
+                </div>
             </div>
-        </main>
-    </div>
-    
+            <div class="session-actions">
+                <button id="start-recording" class="btn btn-primary">Start Recording</button>
+                <button id="stop-recording" class="btn btn-danger" disabled>Stop</button>
+                <button id="refresh-devices" class="btn btn-ghost">Refresh Devices</button>
+            </div>
+            <div class="session-hint"></div>
+        </section>
+
+        <section class="panel transcript">
+            <div class="panel-header">
+                <div>
+                    <p class="panel-eyebrow">Live Transcript</p>
+                    <h2>Streamed Notes</h2>
+                </div>
+                <div class="panel-actions">
+                    <button id="auto-scroll" class="btn btn-ghost btn-small">Auto-scroll: On</button>
+                    <button id="copy-transcript" class="btn btn-ghost btn-small">Copy</button>
+                </div>
+            </div>
+            <div id="transcript-stream" class="transcript-stream">
+                <p id="transcript-placeholder" class="transcript-placeholder">Waiting for new audio...</p>
+            </div>
+        </section>
+
+        <section class="panel summary">
+            <div class="panel-header">
+                <div>
+                    <p class="panel-eyebrow">Summary</p>
+                    <h2>What Matters</h2>
+                </div>
+                <div class="panel-tabs">
+                    <button id="keypoints-tab" class="tab active">Key Points</button>
+                    <button id="actions-tab" class="tab">Actions</button>
+                    <button class="tab">Decisions</button>
+                </div>
+            </div>
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <h3>Key Points</h3>
+                    <ul id="keypoints-list">
+                        <li>No key points yet.</li>
+                    </ul>
+                </div>
+                <div class="summary-card accent">
+                    <h3>Action Items</h3>
+                    <ul id="actions-list">
+                        <li>No action items yet.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <section class="panel library">
+        <div class="panel-header">
+            <div>
+                <p class="panel-eyebrow">Library</p>
+                <h2>Recent Recordings</h2>
+            </div>
+            <button id="refresh-recordings" class="btn btn-ghost">Refresh</button>
+        </div>
+        <div id="recordings-list" class="recordings-list">
+            <p class="loading-text">Loading recordings...</p>
+        </div>
+    </section>
+
+    <section class="panel cli">
+        <div class="panel-header">
+            <div>
+                <p class="panel-eyebrow">CLI Playbook</p>
+                <h2>Run Sessions from Terminal</h2>
+            </div>
+        </div>
+        <div class="cli-grid">
+            <div class="cli-card">
+                <p class="cli-title">Start recording</p>
+                <div class="cli-code">
+                    <code>python record_cli.py --record</code>
+                    <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --record')">Copy</button>
+                </div>
+                <p class="cli-note">Full prompts: meeting name, device select, record.</p>
+            </div>
+            <div class="cli-card">
+                <p class="cli-title">Quick prompt</p>
+                <div class="cli-code">
+                    <code>python record_cli.py --quick</code>
+                    <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --quick')">Copy</button>
+                </div>
+                <p class="cli-note">Remembers last mic + template.</p>
+            </div>
+            <div class="cli-card">
+                <p class="cli-title">List devices</p>
+                <div class="cli-code">
+                    <code>python record_cli.py --list-devices</code>
+                    <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --list-devices')">Copy</button>
+                </div>
+                <p class="cli-note">Helpful before first session.</p>
+            </div>
+            <div class="cli-card">
+                <p class="cli-title">List recordings</p>
+                <div class="cli-code">
+                    <code>python record_cli.py --list-recordings</code>
+                    <button class="copy-btn" onclick="copyToClipboard('python record_cli.py --list-recordings')">Copy</button>
+                </div>
+                <p class="cli-note">Local history from the CLI.</p>
+            </div>
+        </div>
+    </section>
+
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

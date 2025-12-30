@@ -17,12 +17,15 @@ import json
 from config import Config
 from meeting_service import MeetingService
 import argparse
+import socketio
 
 class LocalScribeCLI:
     def __init__(self):
         self.meeting_service = MeetingService()
         self.current_recording = None
         self.is_recording = False
+        self.ui_socket = None
+        self.ui_socket_url = os.environ.get('LOCALSCRIBE_UI_URL')
         # Persist last selections under user home
         self.state_dir = Path.home() / '.localscribe'
         self.state_file = self.state_dir / 'state.json'
@@ -224,11 +227,15 @@ class LocalScribeCLI:
                     print(f"\nℹ️  {message}")
                 else:
                     print(f"ℹ️  {message}")
+
+                self._emit_ui_status(meeting_id, status, message)
             
             # Start the recording
             self.current_recording = self.meeting_service.start_recording(
                 meeting_name, device_id, prompt_type
             )
+            self._connect_ui_socket()
+            self._emit_ui_status(self.current_recording, 'recording', f"Recording: {meeting_name}", meeting_name)
             # Persist last-used selections
             self._save_last_selection(device_id, prompt_type)
             self.meeting_service.add_status_callback(self.current_recording, status_callback)
@@ -276,9 +283,51 @@ class LocalScribeCLI:
                 
             self.is_recording = False
             self.current_recording = None
+            self._disconnect_ui_socket()
             
         except Exception as e:
             print(f"❌ Error stopping recording: {e}")
+
+    def _connect_ui_socket(self):
+        if not self.ui_socket_url or self.ui_socket:
+            return
+        try:
+            self.ui_socket = socketio.Client()
+            self.ui_socket.connect(self.ui_socket_url, transports=['websocket'])
+        except Exception as e:
+            print(f"⚠️  UI socket connection failed: {e}")
+            self.ui_socket = None
+
+    def _disconnect_ui_socket(self):
+        if not self.ui_socket:
+            return
+        try:
+            self.ui_socket.disconnect()
+        except Exception:
+            pass
+        self.ui_socket = None
+
+    def _emit_ui_status(self, meeting_id, status, message, meeting_name=None):
+        if not self.ui_socket:
+            return
+        payload = {
+            'meeting_id': meeting_id,
+            'status': status,
+            'message': message,
+            'type': 'status'
+        }
+        if status == 'transcription':
+            payload = {
+                'meeting_id': meeting_id,
+                'text': message,
+                'type': 'transcription'
+            }
+        if meeting_name:
+            payload['meeting_name'] = meeting_name
+        try:
+            self.ui_socket.emit('cli_meeting_status', payload)
+        except Exception:
+            pass
     
     def list_recordings(self):
         """List all recorded meetings"""

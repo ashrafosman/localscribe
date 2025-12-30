@@ -156,6 +156,79 @@ def get_files():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/summary/keypoints', methods=['POST'])
+def summarize_keypoints():
+    """Summarize transcript into key points"""
+    try:
+        data = request.get_json() or {}
+        transcript_text = data.get('text', '').strip()
+        if not transcript_text:
+            return jsonify({'error': 'Transcript text is required'}), 400
+
+        if not meeting_service.config.PERPLEXITY_API_KEY:
+            return jsonify({'error': 'PERPLEXITY_API_KEY is not configured'}), 400
+
+        prompt_content = (
+            "You are a meeting assistant. Return only key points as short bullet items. "
+            "Do not include headings, introductions, or extra commentary."
+        )
+        summary = meeting_service.summarize_text(transcript_text, prompt_content)
+        return jsonify({'summary': summary})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/summary/action-items', methods=['POST'])
+def summarize_action_items():
+    """Summarize transcript into action items"""
+    try:
+        data = request.get_json() or {}
+        transcript_text = data.get('text', '').strip()
+        if not transcript_text:
+            return jsonify({'error': 'Transcript text is required'}), 400
+
+        if not meeting_service.config.PERPLEXITY_API_KEY:
+            return jsonify({'error': 'PERPLEXITY_API_KEY is not configured'}), 400
+
+        prompt_content = (
+            "You are a meeting assistant. Extract action items as short bullet items. "
+            "Include owner names if mentioned. Do not include headings or extra commentary."
+        )
+        summary = meeting_service.summarize_text(transcript_text, prompt_content)
+        return jsonify({'summary': summary})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def settings():
+    """Get or update application settings"""
+    if request.method == 'GET':
+        return jsonify({
+            'calls_output_path': str(meeting_service.config.CALLS_OUTPUT_PATH)
+        })
+
+    try:
+        data = request.get_json() or {}
+        output_path = data.get('calls_output_path', '').strip()
+        if not output_path:
+            return jsonify({'error': 'calls_output_path is required'}), 400
+
+        resolved = Path(output_path).expanduser().resolve()
+        resolved.mkdir(parents=True, exist_ok=True)
+        if not resolved.is_dir():
+            return jsonify({'error': 'calls_output_path must be a directory'}), 400
+
+        # Update runtime config
+        Config.CALLS_OUTPUT_PATH = resolved
+        meeting_service.config.CALLS_OUTPUT_PATH = resolved
+
+        # Persist to .env for future runs
+        env_path = Path(__file__).parent / '.env'
+        _update_env_setting(env_path, 'CALLS_OUTPUT_PATH', str(resolved))
+
+        return jsonify({'calls_output_path': str(resolved)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/download')
 def download_file():
     """Download a meeting file"""
@@ -201,6 +274,12 @@ def handle_disconnect():
     """Handle WebSocket disconnection"""
     print('Client disconnected')
 
+@socketio.on('cli_meeting_status')
+def handle_cli_meeting_status(payload):
+    """Relay CLI updates to connected UI clients"""
+    if payload:
+        socketio.emit('meeting_status', payload)
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found'}), 404
@@ -230,6 +309,24 @@ def before_first_request():
     if not hasattr(app, '_initialized'):
         initialize()
         app._initialized = True
+
+def _update_env_setting(env_path, key, value):
+    """Update or append a key in the .env file"""
+    lines = []
+    if env_path.exists():
+        lines = env_path.read_text().splitlines()
+
+    updated = False
+    for i, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            lines[i] = f"{key}={value}"
+            updated = True
+            break
+
+    if not updated:
+        lines.append(f"{key}={value}")
+
+    env_path.write_text("\n".join(lines) + "\n")
 
 if __name__ == '__main__':
     # Set up signal handlers for graceful shutdown
