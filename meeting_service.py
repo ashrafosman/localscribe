@@ -469,16 +469,17 @@ class MeetingService:
             raise
     
     def _call_summarization_api(self, transcript_text, prompt_content):
-        """Call Perplexity API for summarization"""
-        url = "https://api.perplexity.ai/chat/completions"
+        """Call summarization API"""
+        url = self.config.SUMMARY_API_URL
         
         headers = {
-            "Authorization": f"Bearer {self.config.PERPLEXITY_API_KEY}",
             "Content-Type": "application/json"
         }
+        if self.config.SUMMARY_API_TOKEN:
+            headers["Authorization"] = f"Bearer {self.config.SUMMARY_API_TOKEN}"
         
         payload = {
-            "model": "sonar",
+            "model": self.config.SUMMARY_API_MODEL,
             "messages": [
                 {"role": "system", "content": prompt_content},
                 {"role": "user", "content": f"Please summarize the following meeting transcript accordingly:\n\n{transcript_text}"}

@@ -203,12 +203,18 @@ def settings():
     """Get or update application settings"""
     if request.method == 'GET':
         return jsonify({
-            'calls_output_path': str(meeting_service.config.CALLS_OUTPUT_PATH)
+            'calls_output_path': str(meeting_service.config.CALLS_OUTPUT_PATH),
+            'summary_api_url': meeting_service.config.SUMMARY_API_URL,
+            'summary_api_model': meeting_service.config.SUMMARY_API_MODEL,
+            'summary_api_token': meeting_service.config.SUMMARY_API_TOKEN or ''
         })
 
     try:
         data = request.get_json() or {}
         output_path = data.get('calls_output_path', '').strip()
+        summary_api_url = data.get('summary_api_url', '').strip()
+        summary_api_model = data.get('summary_api_model', '').strip()
+        summary_api_token = data.get('summary_api_token')
         if not output_path:
             return jsonify({'error': 'calls_output_path is required'}), 400
 
@@ -220,10 +226,25 @@ def settings():
         # Update runtime config
         Config.CALLS_OUTPUT_PATH = resolved
         meeting_service.config.CALLS_OUTPUT_PATH = resolved
+        if summary_api_url:
+            Config.SUMMARY_API_URL = summary_api_url
+            meeting_service.config.SUMMARY_API_URL = summary_api_url
+        if summary_api_model:
+            Config.SUMMARY_API_MODEL = summary_api_model
+            meeting_service.config.SUMMARY_API_MODEL = summary_api_model
+        if summary_api_token is not None:
+            Config.SUMMARY_API_TOKEN = summary_api_token
+            meeting_service.config.SUMMARY_API_TOKEN = summary_api_token
 
         # Persist to .env for future runs
         env_path = Path(__file__).parent / '.env'
         _update_env_setting(env_path, 'CALLS_OUTPUT_PATH', str(resolved))
+        if summary_api_url:
+            _update_env_setting(env_path, 'SUMMARY_API_URL', summary_api_url)
+        if summary_api_model:
+            _update_env_setting(env_path, 'SUMMARY_API_MODEL', summary_api_model)
+        if summary_api_token is not None:
+            _update_env_setting(env_path, 'SUMMARY_API_TOKEN', summary_api_token)
 
         return jsonify({'calls_output_path': str(resolved)})
     except Exception as e:

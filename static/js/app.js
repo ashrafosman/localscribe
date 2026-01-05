@@ -47,6 +47,9 @@ class MeetingApp {
         this.closeSettingsButton = document.getElementById('close-settings');
         this.saveSettingsButton = document.getElementById('save-settings');
         this.outputPathInput = document.getElementById('output-path');
+        this.summaryApiUrlInput = document.getElementById('summary-api-url');
+        this.summaryModelInput = document.getElementById('summary-model');
+        this.summaryApiTokenInput = document.getElementById('summary-api-token');
         this.summaryTabs = [this.keypointsTab, this.actionsTab].filter(Boolean);
         this.autoScroll = true;
         this.currentMeetingId = null;
@@ -72,6 +75,7 @@ class MeetingApp {
         this.openSettingsButton?.addEventListener('click', () => this.openSettings());
         this.closeSettingsButton?.addEventListener('click', () => this.closeSettings());
         this.saveSettingsButton?.addEventListener('click', () => this.saveSettings());
+        this.recordingsList?.addEventListener('click', (event) => this.handleRecordingOpen(event));
         
         // Auto-refresh recordings every 30 seconds
         setInterval(() => this.loadRecordings(), 30000);
@@ -135,6 +139,15 @@ class MeetingApp {
             if (data && data.calls_output_path && this.outputPathInput) {
                 this.outputPathInput.value = data.calls_output_path;
             }
+            if (data && this.summaryApiUrlInput) {
+                this.summaryApiUrlInput.value = data.summary_api_url || '';
+            }
+            if (data && this.summaryModelInput) {
+                this.summaryModelInput.value = data.summary_api_model || '';
+            }
+            if (data && this.summaryApiTokenInput) {
+                this.summaryApiTokenInput.value = data.summary_api_token || '';
+            }
         } catch (error) {
             console.error('Error loading settings:', error);
         }
@@ -145,6 +158,9 @@ class MeetingApp {
             return;
         }
         const pathValue = this.outputPathInput.value.trim();
+        const summaryApiUrl = this.summaryApiUrlInput?.value.trim() || '';
+        const summaryApiModel = this.summaryModelInput?.value.trim() || '';
+        const summaryApiToken = this.summaryApiTokenInput?.value || '';
         if (!pathValue) {
             alert('Please enter a folder path.');
             return;
@@ -154,7 +170,12 @@ class MeetingApp {
             const response = await fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ calls_output_path: pathValue })
+                body: JSON.stringify({
+                    calls_output_path: pathValue,
+                    summary_api_url: summaryApiUrl,
+                    summary_api_model: summaryApiModel,
+                    summary_api_token: summaryApiToken
+                })
             });
             const data = await response.json();
             if (!response.ok) {
@@ -213,6 +234,7 @@ class MeetingApp {
             this.updateElapsedTime();
             this.startTimer();
             this.clearTranscript();
+            this.clearSummary();
             this.updateStatus('recording', data.message || 'Recording started', this.currentMeetingId, meetingName);
             this.startButton.disabled = true;
             this.stopButton.disabled = false;
@@ -321,6 +343,18 @@ class MeetingApp {
         this.transcriptStream.appendChild(this.transcriptPlaceholder);
     }
 
+    clearSummary() {
+        if (this.keypointsList) {
+            this.keypointsList.innerHTML = '<li>No key points yet.</li>';
+        }
+        if (this.actionsList) {
+            this.actionsList.innerHTML = '<li>No action items yet.</li>';
+        }
+        if (this.keypointsTab) {
+            this.setActiveTab('keypoints');
+        }
+    }
+
     startTimer() {
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
@@ -403,7 +437,7 @@ class MeetingApp {
             this.keypointsList.innerHTML = '';
             items.forEach((item) => {
                 const li = document.createElement('li');
-                li.textContent = item;
+                li.innerHTML = this.renderMarkdownInline(item);
                 this.keypointsList.appendChild(li);
             });
         } catch (error) {
@@ -444,7 +478,7 @@ class MeetingApp {
             this.actionsList.innerHTML = '';
             items.forEach((item) => {
                 const li = document.createElement('li');
-                li.textContent = item;
+                li.innerHTML = this.renderMarkdownInline(item);
                 this.actionsList.appendChild(li);
             });
         } catch (error) {
@@ -468,9 +502,33 @@ class MeetingApp {
         }
         const lines = text
             .split('\n')
-            .map((line) => line.replace(/^[-*•]\s*/, '').trim())
+            .map((line) => line.replace(/^[-*•]\s+/, '').replace(/^\d+[.)]\s+/, '').trim())
             .filter(Boolean);
         return lines.length ? lines : [text.trim()];
+    }
+
+    escapeHtml(text) {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    renderMarkdownInline(text) {
+        if (!text) {
+            return '';
+        }
+
+        let html = this.escapeHtml(text);
+
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+        html = html.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
+        html = html.replace(/(^|[^_])_([^_]+)_(?!_)/g, '$1<em>$2</em>');
+        html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        return html;
     }
     
     async loadRecordings() {
@@ -503,12 +561,12 @@ class MeetingApp {
                     </div>
                     <div class="recording-actions">
                         <a href="/api/download?file=${encodeURIComponent(file.transcript_path)}" 
-                           class="btn btn-small" download>
+                           class="btn btn-small" data-open>
                             📝 Download Transcript
                         </a>
                         ${file.summary_path ? 
                             `<a href="/api/download?file=${encodeURIComponent(file.summary_path)}" 
-                                class="btn btn-small" download>
+                                class="btn btn-small" data-open>
                                 📋 Download Summary
                              </a>` : 
                             '<span class="btn btn-small btn-disabled">📋 Summary Processing...</span>'
@@ -519,6 +577,18 @@ class MeetingApp {
         });
         
         this.recordingsList.innerHTML = html;
+    }
+
+    handleRecordingOpen(event) {
+        const link = event.target.closest('a[data-open]');
+        if (!link) {
+            return;
+        }
+        event.preventDefault();
+        const openUrl = link.getAttribute('href');
+        if (openUrl) {
+            window.open(openUrl, '_blank', 'noopener,noreferrer');
+        }
     }
 }
 

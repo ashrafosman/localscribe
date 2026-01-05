@@ -36,6 +36,21 @@
                 <input id="output-path" type="text" placeholder="/Users/you/Documents/Meetings">
                 <p class="form-helper">Changes apply to new recordings and web downloads.</p>
             </div>
+            <div class="form-field">
+                <label for="summary-api-url">Summary API URL</label>
+                <input id="summary-api-url" type="text" placeholder="https://api.perplexity.ai/chat/completions">
+                <p class="form-helper">Optional override for the summarization endpoint.</p>
+            </div>
+            <div class="form-field">
+                <label for="summary-model">Summary model</label>
+                <input id="summary-model" type="text" placeholder="sonar">
+                <p class="form-helper">Model name sent to the summarization API.</p>
+            </div>
+            <div class="form-field">
+                <label for="summary-api-token">Summary API token</label>
+                <input id="summary-api-token" type="password" placeholder="Optional">
+                <p class="form-helper">Leave blank if your endpoint does not require auth.</p>
+            </div>
             <button id="save-settings" class="btn btn-primary">Save Settings</button>
         </div>
     </section>

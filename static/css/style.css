@@ -329,6 +329,22 @@ body {
     color: var(--ink-soft);
     display: grid;
     gap: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.summary-card ul::-webkit-scrollbar {
+    width: 8px;
+}
+
+.summary-card ul::-webkit-scrollbar-track {
+    background: rgba(46, 52, 64, 0.08);
+    border-radius: 999px;
+}
+
+.summary-card ul::-webkit-scrollbar-thumb {
+    background: rgba(46, 52, 64, 0.28);
+    border-radius: 999px;
 }
 
 .summary-card.accent {

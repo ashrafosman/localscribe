@@ -23,6 +23,9 @@ class Config:
     
     # API Keys
     PERPLEXITY_API_KEY = os.environ.get('PERPLEXITY_API_KEY')
+    SUMMARY_API_URL = os.environ.get('SUMMARY_API_URL', 'https://api.perplexity.ai/chat/completions')
+    SUMMARY_API_MODEL = os.environ.get('SUMMARY_API_MODEL', 'sonar')
+    SUMMARY_API_TOKEN = os.environ.get('SUMMARY_API_TOKEN', PERPLEXITY_API_KEY)
     
     # Meeting configuration
     MAX_FILENAME_LENGTH = 100
@@ -33,9 +36,9 @@ class Config:
         """Validate that required paths exist"""
         errors = []
         
-        # Check API key
-        if not cls.PERPLEXITY_API_KEY:
-            errors.append("PERPLEXITY_API_KEY environment variable is required")
+        # Check API token for Perplexity default
+        if cls.SUMMARY_API_URL.startswith('https://api.perplexity.ai') and not cls.SUMMARY_API_TOKEN:
+            errors.append("SUMMARY_API_TOKEN (or PERPLEXITY_API_KEY) is required for Perplexity")
         
         if not cls.WHISPER_CPP_PATH.exists():
             errors.append(f"Whisper.cpp path not found: {cls.WHISPER_CPP_PATH}")
