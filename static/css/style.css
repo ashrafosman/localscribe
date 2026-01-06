@@ -103,6 +103,10 @@ body {
     margin-bottom: 20px;
 }
 
+.panel.summary .panel-header {
+    margin-bottom: 12px;
+}
+
 .panel-eyebrow {
     text-transform: uppercase;
     letter-spacing: 0.18em;

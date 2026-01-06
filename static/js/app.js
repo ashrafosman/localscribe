@@ -91,7 +91,12 @@ class MeetingApp {
         this.closeSettingsButton?.addEventListener('click', () => this.closeSettings());
         this.saveSettingsButton?.addEventListener('click', () => this.saveSettings());
         this.recordingsList?.addEventListener('click', (event) => this.handleRecordingOpen(event));
-        this.askSubmit?.addEventListener('click', () => this.askQuestion());
+        this.askSubmit?.addEventListener('click', () => {
+            if (this.askInput && this.askSubmit) {
+                this.askInput.value = this.askSubmit.textContent.trim();
+            }
+            this.askQuestion();
+        });
         this.askInput?.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
