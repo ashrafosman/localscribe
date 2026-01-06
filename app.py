@@ -165,8 +165,9 @@ def summarize_keypoints():
         if not transcript_text:
             return jsonify({'error': 'Transcript text is required'}), 400
 
-        if not meeting_service.config.PERPLEXITY_API_KEY:
-            return jsonify({'error': 'PERPLEXITY_API_KEY is not configured'}), 400
+        if (meeting_service.config.SUMMARY_API_URL.startswith('https://api.perplexity.ai')
+                and not meeting_service.config.SUMMARY_API_TOKEN):
+            return jsonify({'error': 'SUMMARY_API_TOKEN (or PERPLEXITY_API_KEY) is not configured'}), 400
 
         prompt_content = (
             "You are a meeting assistant. Return only key points as short bullet items. "
@@ -186,8 +187,9 @@ def summarize_action_items():
         if not transcript_text:
             return jsonify({'error': 'Transcript text is required'}), 400
 
-        if not meeting_service.config.PERPLEXITY_API_KEY:
-            return jsonify({'error': 'PERPLEXITY_API_KEY is not configured'}), 400
+        if (meeting_service.config.SUMMARY_API_URL.startswith('https://api.perplexity.ai')
+                and not meeting_service.config.SUMMARY_API_TOKEN):
+            return jsonify({'error': 'SUMMARY_API_TOKEN (or PERPLEXITY_API_KEY) is not configured'}), 400
 
         prompt_content = (
             "You are a meeting assistant. Extract action items as short bullet items. "
@@ -195,6 +197,27 @@ def summarize_action_items():
         )
         summary = meeting_service.summarize_text(transcript_text, prompt_content)
         return jsonify({'summary': summary})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/summary/ask', methods=['POST'])
+def ask_transcript():
+    """Answer a question about the transcript"""
+    try:
+        data = request.get_json() or {}
+        transcript_text = data.get('text', '').strip()
+        question = data.get('question', '').strip()
+        if not transcript_text:
+            return jsonify({'error': 'Transcript text is required'}), 400
+        if not question:
+            return jsonify({'error': 'Question is required'}), 400
+
+        if (meeting_service.config.SUMMARY_API_URL.startswith('https://api.perplexity.ai')
+                and not meeting_service.config.SUMMARY_API_TOKEN):
+            return jsonify({'error': 'SUMMARY_API_TOKEN (or PERPLEXITY_API_KEY) is not configured'}), 400
+
+        answer = meeting_service.ask_question(transcript_text, question)
+        return jsonify({'answer': answer})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

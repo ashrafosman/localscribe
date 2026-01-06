@@ -121,10 +121,10 @@
                 <div class="panel-tabs">
                     <button id="keypoints-tab" class="tab active">Key Points</button>
                     <button id="actions-tab" class="tab">Actions</button>
-                    <button class="tab">Decisions</button>
+                    <button id="ask-tab" class="tab">Ask</button>
                 </div>
             </div>
-            <div class="summary-cards">
+            <div id="summary-cards" class="summary-cards">
                 <div class="summary-card">
                     <h3>Key Points</h3>
                     <ul id="keypoints-list">
@@ -137,6 +137,17 @@
                         <li>No action items yet.</li>
                     </ul>
                 </div>
+            </div>
+            <div id="ask-panel" class="summary-ask hidden">
+                <div>
+                    <h3>Ask the notes</h3>
+                    <p class="ask-hint">Use the live transcript to answer quick questions.</p>
+                </div>
+                <div class="ask-input-row">
+                    <textarea id="ask-input" rows="3" placeholder="Ask about decisions, owners, or timelines..."></textarea>
+                    <button id="ask-submit" class="btn btn-primary btn-small">Ask</button>
+                </div>
+                <div id="ask-response" class="ask-response">No answers yet.</div>
             </div>
         </section>
     </main>

@@ -470,24 +470,29 @@ class MeetingService:
     
     def _call_summarization_api(self, transcript_text, prompt_content):
         """Call summarization API"""
+        messages = [
+            {"role": "system", "content": prompt_content},
+            {"role": "user", "content": f"Please summarize the following meeting transcript accordingly:\n\n{transcript_text}"}
+        ]
+        return self._call_chat_api(messages)
+
+    def _call_chat_api(self, messages):
+        """Call summary/chat API with custom messages"""
         url = self.config.SUMMARY_API_URL
-        
+
         headers = {
             "Content-Type": "application/json"
         }
         if self.config.SUMMARY_API_TOKEN:
             headers["Authorization"] = f"Bearer {self.config.SUMMARY_API_TOKEN}"
-        
+
         payload = {
             "model": self.config.SUMMARY_API_MODEL,
-            "messages": [
-                {"role": "system", "content": prompt_content},
-                {"role": "user", "content": f"Please summarize the following meeting transcript accordingly:\n\n{transcript_text}"}
-            ]
+            "messages": messages
         }
-        
+
         response = requests.post(url, json=payload, headers=headers)
-        
+
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         else:
@@ -500,6 +505,24 @@ class MeetingService:
         if not prompt_content.strip():
             raise ValueError("Prompt content is empty")
         return self._call_summarization_api(transcript_text, prompt_content)
+
+    def ask_question(self, transcript_text, question):
+        """Answer a question based on the transcript"""
+        if not transcript_text.strip():
+            raise ValueError("Transcript text is empty")
+        if not question.strip():
+            raise ValueError("Question is empty")
+
+        system_prompt = (
+            "You are a meeting assistant. Answer the user's question using only the meeting transcript. "
+            "If the answer is not in the transcript, say you don't know. Keep the response concise."
+        )
+        user_prompt = f"Transcript:\n{transcript_text}\n\nQuestion: {question}"
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        return self._call_chat_api(messages)
     
     def _move_files(self, meeting_id):
         """Move transcript and summary files to output directory"""

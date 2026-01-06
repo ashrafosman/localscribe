@@ -351,6 +351,54 @@ body {
     background: rgba(47, 111, 108, 0.08);
 }
 
+.summary-ask {
+    margin-top: 16px;
+    display: grid;
+    gap: 14px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: #fffdf8;
+    padding: 16px;
+}
+
+.ask-hint {
+    color: var(--ink-soft);
+    font-size: 12px;
+}
+
+.ask-input-row {
+    display: grid;
+    gap: 10px;
+}
+
+.ask-input-row textarea {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fffefb;
+    font-size: 14px;
+    font-family: "Space Grotesk", "Avenir Next", sans-serif;
+    color: var(--ink);
+    min-height: 80px;
+    resize: vertical;
+}
+
+.ask-input-row textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.ask-response {
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #fffefc;
+    padding: 12px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    min-height: 56px;
+}
+
 .library {
     margin-bottom: 24px;
 }

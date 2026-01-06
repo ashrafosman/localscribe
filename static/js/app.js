@@ -42,6 +42,12 @@ class MeetingApp {
         this.keypointsList = document.getElementById('keypoints-list');
         this.actionsTab = document.getElementById('actions-tab');
         this.actionsList = document.getElementById('actions-list');
+        this.askTab = document.getElementById('ask-tab');
+        this.askPanel = document.getElementById('ask-panel');
+        this.askInput = document.getElementById('ask-input');
+        this.askSubmit = document.getElementById('ask-submit');
+        this.askResponse = document.getElementById('ask-response');
+        this.summaryCards = document.getElementById('summary-cards');
         this.settingsPanel = document.getElementById('settings-panel');
         this.openSettingsButton = document.getElementById('open-settings');
         this.closeSettingsButton = document.getElementById('close-settings');
@@ -50,7 +56,7 @@ class MeetingApp {
         this.summaryApiUrlInput = document.getElementById('summary-api-url');
         this.summaryModelInput = document.getElementById('summary-model');
         this.summaryApiTokenInput = document.getElementById('summary-api-token');
-        this.summaryTabs = [this.keypointsTab, this.actionsTab].filter(Boolean);
+        this.summaryTabs = [this.keypointsTab, this.actionsTab, this.askTab].filter(Boolean);
         this.autoScroll = true;
         this.currentMeetingId = null;
         this.timerInterval = null;
@@ -72,10 +78,20 @@ class MeetingApp {
             this.setActiveTab('actions');
             this.generateActionItems();
         });
+        this.askTab?.addEventListener('click', () => {
+            this.setActiveTab('ask');
+        });
         this.openSettingsButton?.addEventListener('click', () => this.openSettings());
         this.closeSettingsButton?.addEventListener('click', () => this.closeSettings());
         this.saveSettingsButton?.addEventListener('click', () => this.saveSettings());
         this.recordingsList?.addEventListener('click', (event) => this.handleRecordingOpen(event));
+        this.askSubmit?.addEventListener('click', () => this.askQuestion());
+        this.askInput?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                this.askQuestion();
+            }
+        });
         
         // Auto-refresh recordings every 30 seconds
         setInterval(() => this.loadRecordings(), 30000);
@@ -350,6 +366,12 @@ class MeetingApp {
         if (this.actionsList) {
             this.actionsList.innerHTML = '<li>No action items yet.</li>';
         }
+        if (this.askInput) {
+            this.askInput.value = '';
+        }
+        if (this.askResponse) {
+            this.askResponse.textContent = 'No answers yet.';
+        }
         if (this.keypointsTab) {
             this.setActiveTab('keypoints');
         }
@@ -487,12 +509,65 @@ class MeetingApp {
         }
     }
 
+    async askQuestion() {
+        if (!this.askInput || !this.askResponse) {
+            return;
+        }
+
+        const question = this.askInput.value.trim();
+        if (!question) {
+            alert('Enter a question to ask.');
+            return;
+        }
+
+        const transcriptText = Array.from(this.transcriptStream.querySelectorAll('.transcript-line'))
+            .map((node) => node.textContent)
+            .filter(Boolean)
+            .join('\n');
+
+        if (!transcriptText) {
+            alert('No transcript available yet.');
+            return;
+        }
+
+        this.askResponse.textContent = 'Thinking...';
+
+        try {
+            const response = await fetch('/api/summary/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: transcriptText, question })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to answer question');
+            }
+
+            const answer = data.answer || 'No response received.';
+            this.askResponse.innerHTML = this.renderMarkdownInline(answer);
+        } catch (error) {
+            console.error('Error answering question:', error);
+            this.askResponse.textContent = 'Failed to answer the question.';
+        }
+    }
+
     setActiveTab(tabName) {
         this.summaryTabs.forEach((tab) => tab.classList.remove('active'));
         if (tabName === 'actions' && this.actionsTab) {
             this.actionsTab.classList.add('active');
+        } else if (tabName === 'ask' && this.askTab) {
+            this.askTab.classList.add('active');
         } else if (this.keypointsTab) {
             this.keypointsTab.classList.add('active');
+        }
+        if (this.summaryCards && this.askPanel) {
+            if (tabName === 'ask') {
+                this.summaryCards.classList.add('hidden');
+                this.askPanel.classList.remove('hidden');
+            } else {
+                this.summaryCards.classList.remove('hidden');
+                this.askPanel.classList.add('hidden');
+            }
         }
     }
 
