@@ -66,6 +66,7 @@ class MeetingApp {
         this.startTimestamp = null;
         this.lastReadyCheckMeetingId = null;
         this.summaryReadyInterval = null;
+        this.summaryReady = false;
     }
     
     bindEvents() {
@@ -260,6 +261,7 @@ class MeetingApp {
             }
 
             this.currentMeetingId = data.meeting_id;
+            this.summaryReady = false;
             this.startTimestamp = Date.now();
             this.updateElapsedTime();
             this.startTimer();
@@ -357,9 +359,11 @@ class MeetingApp {
             this.startButton.disabled = false;
             this.stopButton.disabled = true;
             this.currentMeetingId = null;
+            this.summaryReady = false;
             this.stopTimer();
             this.loadRecordings();
             this.stopSummaryReadyPolling();
+            this.setSummaryTabsEnabled(false);
         } else if (status === 'recording') {
             this.checkSummaryReady(meetingId);
         }
@@ -572,7 +576,7 @@ class MeetingApp {
     }
 
     async checkSummaryReady(meetingId) {
-        if (meetingId && this.lastReadyCheckMeetingId === meetingId) {
+        if (meetingId && this.lastReadyCheckMeetingId === meetingId && this.summaryReady) {
             return;
         }
         this.lastReadyCheckMeetingId = meetingId || this.lastReadyCheckMeetingId;
@@ -584,14 +588,17 @@ class MeetingApp {
             if (response.ok && data.ready) {
                 this.setSummaryTabsEnabled(true);
                 this.stopSummaryReadyPolling();
+                this.summaryReady = true;
             } else {
                 this.setSummaryTabsEnabled(false);
                 this.startSummaryReadyPolling();
+                this.summaryReady = false;
             }
         } catch (error) {
             console.error('Error checking summary readiness:', error);
             this.setSummaryTabsEnabled(false);
             this.startSummaryReadyPolling();
+            this.summaryReady = false;
         }
     }
 
