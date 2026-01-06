@@ -200,6 +200,29 @@ def summarize_action_items():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/summary/issues', methods=['POST'])
+def summarize_issues():
+    """Summarize recent issues with solutions"""
+    try:
+        data = request.get_json() or {}
+        transcript_text = data.get('text', '').strip()
+        if not transcript_text:
+            return jsonify({'error': 'Transcript text is required'}), 400
+
+        if (meeting_service.config.SUMMARY_API_URL.startswith('https://api.perplexity.ai')
+                and not meeting_service.config.SUMMARY_API_TOKEN):
+            return jsonify({'error': 'SUMMARY_API_TOKEN (or PERPLEXITY_API_KEY) is not configured'}), 400
+
+        prompt_content = (
+            "You are a meeting assistant. Identify the last 2-3 issues discussed in the transcript. "
+            "For each, propose a concise solution and provide a brief summary. "
+            "Return bullet items only, no headings or extra commentary."
+        )
+        summary = meeting_service.summarize_text(transcript_text, prompt_content)
+        return jsonify({'summary': summary})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/summary/ask', methods=['POST'])
 def ask_transcript():
     """Answer a question about the transcript"""

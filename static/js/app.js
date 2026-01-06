@@ -42,6 +42,8 @@ class MeetingApp {
         this.keypointsList = document.getElementById('keypoints-list');
         this.actionsTab = document.getElementById('actions-tab');
         this.actionsList = document.getElementById('actions-list');
+        this.issuesTab = document.getElementById('issues-tab');
+        this.issuesList = document.getElementById('issues-list');
         this.askTab = document.getElementById('ask-tab');
         this.askPanel = document.getElementById('ask-panel');
         this.askInput = document.getElementById('ask-input');
@@ -56,7 +58,7 @@ class MeetingApp {
         this.summaryApiUrlInput = document.getElementById('summary-api-url');
         this.summaryModelInput = document.getElementById('summary-model');
         this.summaryApiTokenInput = document.getElementById('summary-api-token');
-        this.summaryTabs = [this.keypointsTab, this.actionsTab, this.askTab].filter(Boolean);
+        this.summaryTabs = [this.keypointsTab, this.actionsTab, this.issuesTab, this.askTab].filter(Boolean);
         this.autoScroll = true;
         this.currentMeetingId = null;
         this.timerInterval = null;
@@ -77,6 +79,10 @@ class MeetingApp {
         this.actionsTab?.addEventListener('click', () => {
             this.setActiveTab('actions');
             this.generateActionItems();
+        });
+        this.issuesTab?.addEventListener('click', () => {
+            this.setActiveTab('issues');
+            this.generateIssues();
         });
         this.askTab?.addEventListener('click', () => {
             this.setActiveTab('ask');
@@ -366,6 +372,9 @@ class MeetingApp {
         if (this.actionsList) {
             this.actionsList.innerHTML = '<li>No action items yet.</li>';
         }
+        if (this.issuesList) {
+            this.issuesList.innerHTML = '<li>No issues yet.</li>';
+        }
         if (this.askInput) {
             this.askInput.value = '';
         }
@@ -509,6 +518,47 @@ class MeetingApp {
         }
     }
 
+    async generateIssues() {
+        if (!this.issuesList) {
+            return;
+        }
+
+        const transcriptText = Array.from(this.transcriptStream.querySelectorAll('.transcript-line'))
+            .map((node) => node.textContent)
+            .filter(Boolean)
+            .join('\n');
+
+        if (!transcriptText) {
+            alert('No transcript available yet.');
+            return;
+        }
+
+        this.issuesList.innerHTML = '<li>Generating issues...</li>';
+
+        try {
+            const response = await fetch('/api/summary/issues', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: transcriptText })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to generate issues');
+            }
+
+            const items = this.parseBulletLines(data.summary);
+            this.issuesList.innerHTML = '';
+            items.forEach((item) => {
+                const li = document.createElement('li');
+                li.innerHTML = this.renderMarkdownInline(item);
+                this.issuesList.appendChild(li);
+            });
+        } catch (error) {
+            console.error('Error generating issues:', error);
+            this.issuesList.innerHTML = '<li>Failed to generate issues.</li>';
+        }
+    }
+
     async askQuestion() {
         if (!this.askInput || !this.askResponse) {
             return;
@@ -555,6 +605,8 @@ class MeetingApp {
         this.summaryTabs.forEach((tab) => tab.classList.remove('active'));
         if (tabName === 'actions' && this.actionsTab) {
             this.actionsTab.classList.add('active');
+        } else if (tabName === 'issues' && this.issuesTab) {
+            this.issuesTab.classList.add('active');
         } else if (tabName === 'ask' && this.askTab) {
             this.askTab.classList.add('active');
         } else if (this.keypointsTab) {

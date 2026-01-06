@@ -94,7 +94,8 @@ class MeetingService:
             'meeting': 'Executive Meeting',
             'technical': 'Technical Review', 
             'sales': 'Sales Call',
-            'standup': 'Daily Standup'
+            'standup': 'Daily Standup',
+            'one_on_one': '1:1 Meeting'
         }
         
         for file_key, display_name in prompt_files.items():
