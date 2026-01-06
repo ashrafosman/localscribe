@@ -50,6 +50,7 @@ class MeetingApp {
         this.askSubmit = document.getElementById('ask-submit');
         this.askResponse = document.getElementById('ask-response');
         this.summaryCards = document.getElementById('summary-cards');
+        this.summaryReadyHint = document.getElementById('summary-ready-hint');
         this.settingsPanel = document.getElementById('settings-panel');
         this.openSettingsButton = document.getElementById('open-settings');
         this.closeSettingsButton = document.getElementById('close-settings');
@@ -63,6 +64,8 @@ class MeetingApp {
         this.currentMeetingId = null;
         this.timerInterval = null;
         this.startTimestamp = null;
+        this.lastReadyCheckMeetingId = null;
+        this.summaryReadyInterval = null;
     }
     
     bindEvents() {
@@ -263,6 +266,7 @@ class MeetingApp {
             this.clearTranscript();
             this.clearSummary();
             this.updateStatus('recording', data.message || 'Recording started', this.currentMeetingId, meetingName);
+            this.checkSummaryReady(this.currentMeetingId);
             this.startButton.disabled = true;
             this.stopButton.disabled = false;
         } catch (error) {
@@ -355,6 +359,9 @@ class MeetingApp {
             this.currentMeetingId = null;
             this.stopTimer();
             this.loadRecordings();
+            this.stopSummaryReadyPolling();
+        } else if (status === 'recording') {
+            this.checkSummaryReady(meetingId);
         }
     }
 
@@ -561,6 +568,65 @@ class MeetingApp {
         } catch (error) {
             console.error('Error generating issues:', error);
             this.issuesList.innerHTML = '<li>Failed to generate issues.</li>';
+        }
+    }
+
+    async checkSummaryReady(meetingId) {
+        if (meetingId && this.lastReadyCheckMeetingId === meetingId) {
+            return;
+        }
+        this.lastReadyCheckMeetingId = meetingId || this.lastReadyCheckMeetingId;
+        this.setSummaryTabsEnabled(false);
+
+        try {
+            const response = await fetch('/api/summary/ready');
+            const data = await response.json();
+            if (response.ok && data.ready) {
+                this.setSummaryTabsEnabled(true);
+                this.stopSummaryReadyPolling();
+            } else {
+                this.setSummaryTabsEnabled(false);
+                this.startSummaryReadyPolling();
+            }
+        } catch (error) {
+            console.error('Error checking summary readiness:', error);
+            this.setSummaryTabsEnabled(false);
+            this.startSummaryReadyPolling();
+        }
+    }
+
+    startSummaryReadyPolling() {
+        if (this.summaryReadyInterval) {
+            return;
+        }
+        this.summaryReadyInterval = setInterval(() => {
+            if (this.currentMeetingId) {
+                this.checkSummaryReady(this.currentMeetingId);
+            } else {
+                this.stopSummaryReadyPolling();
+            }
+        }, 30000);
+    }
+
+    stopSummaryReadyPolling() {
+        if (this.summaryReadyInterval) {
+            clearInterval(this.summaryReadyInterval);
+            this.summaryReadyInterval = null;
+        }
+    }
+
+    setSummaryTabsEnabled(enabled) {
+        this.summaryTabs.forEach((tab) => {
+            tab.disabled = !enabled;
+            if (!enabled) {
+                tab.classList.remove('active');
+            }
+        });
+        if (this.summaryReadyHint) {
+            this.summaryReadyHint.classList.toggle('hidden', enabled);
+        }
+        if (enabled) {
+            this.setActiveTab('keypoints');
         }
     }
 

@@ -244,6 +244,19 @@ def ask_transcript():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/summary/ready')
+def summary_ready():
+    """Check if summary model endpoint is ready"""
+    try:
+        if (meeting_service.config.SUMMARY_API_URL.startswith('https://api.perplexity.ai')
+                and not meeting_service.config.SUMMARY_API_TOKEN):
+            return jsonify({'ready': False, 'error': 'SUMMARY_API_TOKEN (or PERPLEXITY_API_KEY) is not configured'}), 200
+
+        meeting_service.check_summary_ready()
+        return jsonify({'ready': True, 'error': ''}), 200
+    except Exception as e:
+        return jsonify({'ready': False, 'error': str(e)}), 200
+
 @app.route('/api/settings', methods=['GET', 'POST'])
 def settings():
     """Get or update application settings"""

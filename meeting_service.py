@@ -477,7 +477,36 @@ class MeetingService:
         ]
         return self._call_chat_api(messages)
 
-    def _call_chat_api(self, messages):
+    def _extract_message_content(self, message):
+        """Normalize model response content to a string."""
+        if isinstance(message, str):
+            return message
+        if not isinstance(message, dict):
+            return str(message)
+        content = message.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                    continue
+                if not isinstance(item, dict):
+                    parts.append(str(item))
+                    continue
+                if "text" in item and isinstance(item["text"], str):
+                    parts.append(item["text"])
+                if "summary_text" in item and isinstance(item["summary_text"], str):
+                    parts.append(item["summary_text"])
+                if "summary" in item and isinstance(item["summary"], list):
+                    for summary in item["summary"]:
+                        if isinstance(summary, dict) and isinstance(summary.get("summary_text"), str):
+                            parts.append(summary["summary_text"])
+            return "\n".join([part for part in parts if part])
+        return str(content) if content is not None else ""
+
+    def _call_chat_api(self, messages, extra_payload=None):
         """Call summary/chat API with custom messages"""
         url = self.config.SUMMARY_API_URL
 
@@ -491,11 +520,25 @@ class MeetingService:
             "model": self.config.SUMMARY_API_MODEL,
             "messages": messages
         }
+        if extra_payload:
+            payload.update(extra_payload)
 
         response = requests.post(url, json=payload, headers=headers)
 
         if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
+            data = response.json()
+            if isinstance(data, dict) and "choices" in data:
+                message = data["choices"][0].get("message", {})
+                return self._extract_message_content(message)
+            if isinstance(data, dict) and "predictions" in data:
+                prediction = data["predictions"][0]
+                if isinstance(prediction, dict) and "choices" in prediction:
+                    message = prediction["choices"][0].get("message", {})
+                    return self._extract_message_content(message)
+                if isinstance(prediction, dict) and "generated_text" in prediction:
+                    return prediction["generated_text"]
+                return self._extract_message_content(prediction)
+            return self._extract_message_content(data)
         else:
             raise Exception(f"API Error: {response.status_code}, {response.text}")
 
@@ -524,6 +567,15 @@ class MeetingService:
             {"role": "user", "content": user_prompt}
         ]
         return self._call_chat_api(messages)
+
+    def check_summary_ready(self):
+        """Check if the summary model endpoint is reachable"""
+        messages = [
+            {"role": "system", "content": "You are a test assistant."},
+            {"role": "user", "content": "Respond with OK."}
+        ]
+        self._call_chat_api(messages, extra_payload={"max_tokens": 4})
+        return True
     
     def _move_files(self, meeting_id):
         """Move transcript and summary files to output directory"""
