@@ -72,12 +72,13 @@ def start_recording():
         data = request.get_json()
         meeting_name = data.get('meeting_name', '').strip()
         audio_device_id = data.get('audio_device_id', -1)
+        audio_device_name = data.get('audio_device_name')
         prompt_type = data.get('prompt_type', 'meeting')
         
         if not meeting_name:
             return jsonify({'error': 'Meeting name is required'}), 400
         
-        meeting_id = meeting_service.start_recording(meeting_name, audio_device_id, prompt_type)
+        meeting_id = meeting_service.start_recording(meeting_name, audio_device_id, prompt_type, audio_device_name)
         
         # Add WebSocket callback for this meeting
         def status_callback(meeting_id, status, message):
@@ -244,6 +245,28 @@ def ask_transcript():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/summary/last-topic', methods=['POST'])
+def summarize_last_topic():
+    """Summarize the last topic from a transcript excerpt"""
+    try:
+        data = request.get_json() or {}
+        transcript_text = data.get('text', '').strip()
+        if not transcript_text:
+            return jsonify({'error': 'Transcript text is required'}), 400
+
+        if (meeting_service.config.SUMMARY_API_URL.startswith('https://api.perplexity.ai')
+                and not meeting_service.config.SUMMARY_API_TOKEN):
+            return jsonify({'error': 'SUMMARY_API_TOKEN (or PERPLEXITY_API_KEY) is not configured'}), 400
+
+        prompt_content = (
+            "You are a meeting assistant. Summarize the last topic discussed in this excerpt. "
+            "Respond with a short summary, 1-2 sentences."
+        )
+        summary = meeting_service.summarize_text(transcript_text, prompt_content)
+        return jsonify({'summary': summary})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/summary/ready')
 def summary_ready():
     """Check if summary model endpoint is ready"""
@@ -257,6 +280,15 @@ def summary_ready():
     except Exception as e:
         return jsonify({'ready': False, 'error': str(e)}), 200
 
+@app.route('/api/whisper/ready')
+def whisper_ready():
+    """Check if Whisper API endpoint is ready"""
+    try:
+        meeting_service.check_whisper_api_ready()
+        return jsonify({'ready': True, 'error': ''}), 200
+    except Exception as e:
+        return jsonify({'ready': False, 'error': str(e)}), 200
+
 @app.route('/api/settings', methods=['GET', 'POST'])
 def settings():
     """Get or update application settings"""
@@ -265,7 +297,10 @@ def settings():
             'calls_output_path': str(meeting_service.config.CALLS_OUTPUT_PATH),
             'summary_api_url': meeting_service.config.SUMMARY_API_URL,
             'summary_api_model': meeting_service.config.SUMMARY_API_MODEL,
-            'summary_api_token': meeting_service.config.SUMMARY_API_TOKEN or ''
+            'summary_api_token': meeting_service.config.SUMMARY_API_TOKEN or '',
+            'whisper_mode': meeting_service.config.WHISPER_MODE,
+            'whisper_api_url': meeting_service.config.WHISPER_API_URL,
+            'whisper_api_token': meeting_service.config.WHISPER_API_TOKEN or ''
         })
 
     try:
@@ -274,8 +309,14 @@ def settings():
         summary_api_url = data.get('summary_api_url', '').strip()
         summary_api_model = data.get('summary_api_model', '').strip()
         summary_api_token = data.get('summary_api_token')
+        whisper_mode = data.get('whisper_mode', '').strip().lower()
+        whisper_api_url = data.get('whisper_api_url', '').strip()
+        whisper_api_token = data.get('whisper_api_token')
+
         if not output_path:
             return jsonify({'error': 'calls_output_path is required'}), 400
+        if whisper_mode and whisper_mode not in ['local', 'api']:
+            return jsonify({'error': 'whisper_mode must be local or api'}), 400
 
         resolved = Path(output_path).expanduser().resolve()
         resolved.mkdir(parents=True, exist_ok=True)
@@ -294,6 +335,15 @@ def settings():
         if summary_api_token is not None:
             Config.SUMMARY_API_TOKEN = summary_api_token
             meeting_service.config.SUMMARY_API_TOKEN = summary_api_token
+        if whisper_mode:
+            Config.WHISPER_MODE = whisper_mode
+            meeting_service.config.WHISPER_MODE = whisper_mode
+        if whisper_api_url:
+            Config.WHISPER_API_URL = whisper_api_url
+            meeting_service.config.WHISPER_API_URL = whisper_api_url
+        if whisper_api_token is not None:
+            Config.WHISPER_API_TOKEN = whisper_api_token
+            meeting_service.config.WHISPER_API_TOKEN = whisper_api_token
 
         # Persist to .env for future runs
         env_path = Path(__file__).parent / '.env'
@@ -304,6 +354,12 @@ def settings():
             _update_env_setting(env_path, 'SUMMARY_API_MODEL', summary_api_model)
         if summary_api_token is not None:
             _update_env_setting(env_path, 'SUMMARY_API_TOKEN', summary_api_token)
+        if whisper_mode:
+            _update_env_setting(env_path, 'WHISPER_MODE', whisper_mode)
+        if whisper_api_url:
+            _update_env_setting(env_path, 'WHISPER_API_URL', whisper_api_url)
+        if whisper_api_token is not None:
+            _update_env_setting(env_path, 'WHISPER_API_TOKEN', whisper_api_token)
 
         return jsonify({'calls_output_path': str(resolved)})
     except Exception as e:

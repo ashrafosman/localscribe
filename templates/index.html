@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LocalScribe - Smart Meeting Transcription</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -50,6 +51,26 @@
                 <label for="summary-api-token">Summary API token</label>
                 <input id="summary-api-token" type="password" placeholder="Optional">
                 <p class="form-helper">Leave blank if your endpoint does not require auth.</p>
+            </div>
+            <div class="form-field">
+                <label for="whisper-mode">Whisper mode</label>
+                <select id="whisper-mode">
+                    <option value="local">Local (whisper.cpp)</option>
+                    <option value="api">API (Databricks)</option>
+                </select>
+                <p class="form-helper">Choose local whisper or the real-time API.</p>
+            </div>
+            <div class="form-field">
+                <label for="whisper-api-url">Whisper API URL</label>
+                <input id="whisper-api-url" type="text" placeholder="https://.../serving-endpoints/whisper/invocations">
+                <p class="form-helper">Used when Whisper mode is set to API.</p>
+            </div>
+            <div class="form-field">
+                <label for="whisper-api-token">Whisper API token</label>
+                <input id="whisper-api-token" type="password" placeholder="Optional">
+                <p class="form-helper">
+                    <span id="whisper-api-status" class="availability-pill">Status: unknown</span>
+                </p>
             </div>
             <button id="save-settings" class="btn btn-primary">Save Settings</button>
         </div>
@@ -99,6 +120,7 @@
             <div class="panel-header">
                 <div>
                     <p class="panel-eyebrow">Live Transcript</p>
+                    <span id="transcript-source" class="availability-pill">Source: Unknown</span>
                 </div>
                 <div class="panel-actions">
                     <button id="auto-scroll" class="btn btn-ghost btn-small">Auto-scroll: On</button>
@@ -150,7 +172,10 @@
                 </div>
                 <div class="ask-input-row">
                     <textarea id="ask-input" rows="3" placeholder="Ask about decisions, owners, or timelines..."></textarea>
-                    <button id="ask-submit" class="btn btn-primary btn-small">What should i ask next?</button>
+                    <div class="ask-actions">
+                        <button id="ask-submit" class="btn btn-primary btn-small">What should i ask next?</button>
+                        <button id="ask-last-topic" class="btn btn-ghost btn-small">What was the last topic</button>
+                    </div>
                 </div>
                 <div id="ask-response" class="ask-response">No answers yet.</div>
             </div>

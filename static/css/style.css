@@ -85,6 +85,7 @@ body {
     grid-template-columns: 1.1fr 1.6fr 1.2fr;
     gap: 24px;
     margin-bottom: 24px;
+    align-items: stretch;
 }
 
 .panel {
@@ -258,6 +259,27 @@ body {
     color: var(--ink-soft);
 }
 
+.availability-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    background: rgba(46, 52, 64, 0.08);
+    color: var(--ink-soft);
+}
+
+.availability-pill.ready {
+    background: rgba(47, 111, 108, 0.16);
+    color: var(--accent);
+}
+
+.availability-pill.error {
+    background: rgba(196, 87, 45, 0.18);
+    color: var(--warm);
+}
+
 .session-hint {
     font-size: 13px;
     color: var(--ink-soft);
@@ -266,6 +288,18 @@ body {
 .panel.transcript {
     display: flex;
     flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.panel.summary {
+    height: 100%;
+    min-height: 0;
+}
+
+.panel.summary {
+    height: 100%;
 }
 
 .transcript-stream {
@@ -273,11 +307,12 @@ body {
     border-radius: 16px;
     padding: 18px;
     background: #fffefc;
-    height: 420px;
+    min-height: 0;
     font-family: "JetBrains Mono", "Fira Mono", monospace;
     font-size: 13px;
     line-height: 1.7;
     overflow-y: auto;
+    flex: 1;
 }
 
 .transcript-stream::-webkit-scrollbar {
@@ -388,6 +423,12 @@ body {
 .ask-input-row {
     display: grid;
     gap: 10px;
+}
+
+.ask-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .ask-input-row textarea {

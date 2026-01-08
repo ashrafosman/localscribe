@@ -4,3 +4,6 @@ python-socketio==5.9.0
 requests==2.31.0
 pathlib2==2.3.7
 python-dotenv==1.0.0
+numpy==1.26.4
+scipy==1.11.4
+sounddevice==0.4.6

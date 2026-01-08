@@ -27,6 +27,9 @@ class MeetingApp {
         this.refreshBtn = document.getElementById('refresh-recordings');
         this.transcriptStream = document.getElementById('transcript-stream');
         this.transcriptPlaceholder = document.getElementById('transcript-placeholder');
+        this.transcriptSource = document.getElementById('transcript-source');
+        this.transcriptPanel = document.querySelector('.panel.transcript');
+        this.summaryPanel = document.querySelector('.panel.summary');
         this.statusPill = document.getElementById('status-pill');
         this.autoScrollButton = document.getElementById('auto-scroll');
         this.copyTranscriptButton = document.getElementById('copy-transcript');
@@ -48,6 +51,7 @@ class MeetingApp {
         this.askPanel = document.getElementById('ask-panel');
         this.askInput = document.getElementById('ask-input');
         this.askSubmit = document.getElementById('ask-submit');
+        this.askLastTopic = document.getElementById('ask-last-topic');
         this.askResponse = document.getElementById('ask-response');
         this.summaryCards = document.getElementById('summary-cards');
         this.summaryReadyHint = document.getElementById('summary-ready-hint');
@@ -59,6 +63,10 @@ class MeetingApp {
         this.summaryApiUrlInput = document.getElementById('summary-api-url');
         this.summaryModelInput = document.getElementById('summary-model');
         this.summaryApiTokenInput = document.getElementById('summary-api-token');
+        this.whisperModeSelect = document.getElementById('whisper-mode');
+        this.whisperApiUrlInput = document.getElementById('whisper-api-url');
+        this.whisperApiTokenInput = document.getElementById('whisper-api-token');
+        this.whisperApiStatus = document.getElementById('whisper-api-status');
         this.summaryTabs = [this.keypointsTab, this.actionsTab, this.issuesTab, this.askTab].filter(Boolean);
         this.autoScroll = true;
         this.currentMeetingId = null;
@@ -101,12 +109,19 @@ class MeetingApp {
             }
             this.askQuestion();
         });
+        this.askLastTopic?.addEventListener('click', () => {
+            if (this.askInput && this.askLastTopic) {
+                this.askInput.value = this.askLastTopic.textContent.trim();
+            }
+            this.askLastTopicSummary();
+        });
         this.askInput?.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 this.askQuestion();
             }
         });
+        this.setupTranscriptSync();
         
         // Auto-refresh recordings every 30 seconds
         setInterval(() => this.loadRecordings(), 30000);
@@ -125,6 +140,29 @@ class MeetingApp {
         this.socket.on('meeting_status', (payload) => {
             this.handleMeetingStatus(payload);
         });
+    }
+
+    setupTranscriptSync() {
+        if (!this.transcriptPanel || !this.summaryPanel) {
+            return;
+        }
+        const sync = () => this.syncTranscriptHeight();
+        if (typeof ResizeObserver !== 'undefined') {
+            this.summaryResizeObserver = new ResizeObserver(sync);
+            this.summaryResizeObserver.observe(this.summaryPanel);
+        }
+        window.addEventListener('resize', sync);
+        sync();
+    }
+
+    syncTranscriptHeight() {
+        if (!this.transcriptPanel || !this.summaryPanel) {
+            return;
+        }
+        const summaryHeight = this.summaryPanel.offsetHeight;
+        if (summaryHeight > 0) {
+            this.transcriptPanel.style.height = `${summaryHeight}px`;
+        }
     }
 
     async loadDevices() {
@@ -179,6 +217,16 @@ class MeetingApp {
             if (data && this.summaryApiTokenInput) {
                 this.summaryApiTokenInput.value = data.summary_api_token || '';
             }
+            if (data && this.whisperModeSelect) {
+                this.whisperModeSelect.value = data.whisper_mode || 'local';
+            }
+            if (data && this.whisperApiUrlInput) {
+                this.whisperApiUrlInput.value = data.whisper_api_url || '';
+            }
+            if (data && this.whisperApiTokenInput) {
+                this.whisperApiTokenInput.value = data.whisper_api_token || '';
+            }
+            this.checkWhisperApiReady();
         } catch (error) {
             console.error('Error loading settings:', error);
         }
@@ -192,6 +240,9 @@ class MeetingApp {
         const summaryApiUrl = this.summaryApiUrlInput?.value.trim() || '';
         const summaryApiModel = this.summaryModelInput?.value.trim() || '';
         const summaryApiToken = this.summaryApiTokenInput?.value || '';
+        const whisperMode = this.whisperModeSelect?.value || 'local';
+        const whisperApiUrl = this.whisperApiUrlInput?.value.trim() || '';
+        const whisperApiToken = this.whisperApiTokenInput?.value || '';
         if (!pathValue) {
             alert('Please enter a folder path.');
             return;
@@ -205,7 +256,10 @@ class MeetingApp {
                     calls_output_path: pathValue,
                     summary_api_url: summaryApiUrl,
                     summary_api_model: summaryApiModel,
-                    summary_api_token: summaryApiToken
+                    summary_api_token: summaryApiToken,
+                    whisper_mode: whisperMode,
+                    whisper_api_url: whisperApiUrl,
+                    whisper_api_token: whisperApiToken
                 })
             });
             const data = await response.json();
@@ -215,9 +269,40 @@ class MeetingApp {
             this.outputPathInput.value = data.calls_output_path;
             this.closeSettings();
             this.loadRecordings();
+            this.checkWhisperApiReady();
         } catch (error) {
             console.error('Error saving settings:', error);
             alert(error.message);
+        }
+    }
+
+    async checkWhisperApiReady() {
+        if (!this.whisperApiStatus) {
+            return;
+        }
+        this.setWhisperApiStatus('Checking...');
+        try {
+            const response = await fetch('/api/whisper/ready');
+            const data = await response.json();
+            if (response.ok && data.ready) {
+                this.setWhisperApiStatus('API available', 'ready');
+            } else {
+                this.setWhisperApiStatus('API unavailable', 'error');
+            }
+        } catch (error) {
+            console.error('Error checking whisper API readiness:', error);
+            this.setWhisperApiStatus('API unavailable', 'error');
+        }
+    }
+
+    setWhisperApiStatus(text, state) {
+        if (!this.whisperApiStatus) {
+            return;
+        }
+        this.whisperApiStatus.textContent = text;
+        this.whisperApiStatus.classList.remove('ready', 'error');
+        if (state) {
+            this.whisperApiStatus.classList.add(state);
         }
     }
 
@@ -244,6 +329,7 @@ class MeetingApp {
         const payload = {
             meeting_name: meetingName,
             audio_device_id: parseInt(this.deviceSelect.value, 10),
+            audio_device_name: this.deviceSelect.options[this.deviceSelect.selectedIndex]?.textContent || '',
             prompt_type: this.promptSelect.value
         };
 
@@ -364,8 +450,29 @@ class MeetingApp {
             this.loadRecordings();
             this.stopSummaryReadyPolling();
             this.setSummaryTabsEnabled(false);
+            this.setTranscriptSource('Unknown');
         } else if (status === 'recording') {
             this.checkSummaryReady(meetingId);
+            if (message) {
+                if (message.includes('(API)')) {
+                    this.setTranscriptSource('Remote', 'ready');
+                } else if (message.includes('local fallback') || message.toLowerCase().includes('local')) {
+                    this.setTranscriptSource('Local');
+                } else {
+                    this.setTranscriptSource('Local');
+                }
+            }
+        }
+    }
+
+    setTranscriptSource(source, state) {
+        if (!this.transcriptSource) {
+            return;
+        }
+        this.transcriptSource.textContent = `Source: ${source}`;
+        this.transcriptSource.classList.remove('ready', 'error');
+        if (state) {
+            this.transcriptSource.classList.add(state);
         }
     }
 
@@ -676,6 +783,42 @@ class MeetingApp {
         } catch (error) {
             console.error('Error answering question:', error);
             this.askResponse.textContent = 'Failed to answer the question.';
+        }
+    }
+
+    async askLastTopicSummary() {
+        if (!this.askResponse) {
+            return;
+        }
+
+        const lines = Array.from(this.transcriptStream.querySelectorAll('.transcript-line'))
+            .map((node) => node.textContent)
+            .filter(Boolean);
+
+        if (!lines.length) {
+            alert('No transcript available yet.');
+            return;
+        }
+
+        const excerpt = lines.slice(-10).join('\n');
+        this.askResponse.textContent = 'Thinking...';
+
+        try {
+            const response = await fetch('/api/summary/last-topic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: excerpt })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to summarize last topic');
+            }
+
+            const answer = data.summary || 'No response received.';
+            this.askResponse.innerHTML = this.renderMarkdownInline(answer);
+        } catch (error) {
+            console.error('Error summarizing last topic:', error);
+            this.askResponse.textContent = 'Failed to summarize the last topic.';
         }
     }
 
