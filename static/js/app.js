@@ -30,6 +30,12 @@ class MeetingApp {
         this.transcriptSource = document.getElementById('transcript-source');
         this.transcriptPanel = document.querySelector('.panel.transcript');
         this.summaryPanel = document.querySelector('.panel.summary');
+        this.summaryViewer = document.getElementById('summary-viewer');
+        this.summaryViewerTitle = document.getElementById('summary-viewer-title');
+        this.summaryViewerContent = document.getElementById('summary-viewer-content');
+        this.summaryViewerClose = document.getElementById('summary-close');
+        this.summaryViewerCopy = document.getElementById('summary-copy');
+        this.summaryViewerDownload = document.getElementById('summary-download');
         this.statusPill = document.getElementById('status-pill');
         this.autoScrollButton = document.getElementById('auto-scroll');
         this.copyTranscriptButton = document.getElementById('copy-transcript');
@@ -103,6 +109,13 @@ class MeetingApp {
         this.closeSettingsButton?.addEventListener('click', () => this.closeSettings());
         this.saveSettingsButton?.addEventListener('click', () => this.saveSettings());
         this.recordingsList?.addEventListener('click', (event) => this.handleRecordingOpen(event));
+        this.summaryViewerClose?.addEventListener('click', () => this.closeSummaryViewer());
+        this.summaryViewerCopy?.addEventListener('click', () => this.copySummary());
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                this.closeSummaryViewer();
+            }
+        });
         this.askSubmit?.addEventListener('click', () => {
             if (this.askInput && this.askSubmit) {
                 this.askInput.value = this.askSubmit.textContent.trim();
@@ -878,6 +891,49 @@ class MeetingApp {
 
         return html;
     }
+
+    renderMarkdownBlock(text) {
+        if (!text) {
+            return '<p>No summary available.</p>';
+        }
+        const lines = text.split('\n');
+        const chunks = [];
+        let listItems = [];
+
+        const flushList = () => {
+            if (!listItems.length) {
+                return;
+            }
+            const itemsHtml = listItems
+                .map((item) => `<li>${this.renderMarkdownInline(item)}</li>`)
+                .join('');
+            chunks.push(`<ul>${itemsHtml}</ul>`);
+            listItems = [];
+        };
+
+        lines.forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) {
+                flushList();
+                return;
+            }
+            const bulletMatch = trimmed.match(/^[-*•]\s+(.+)/);
+            if (bulletMatch) {
+                listItems.push(bulletMatch[1]);
+                return;
+            }
+            const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)/);
+            if (headingMatch) {
+                flushList();
+                chunks.push(`<h3>${this.renderMarkdownInline(headingMatch[2])}</h3>`);
+                return;
+            }
+            flushList();
+            chunks.push(`<p>${this.renderMarkdownInline(trimmed)}</p>`);
+        });
+        flushList();
+        return chunks.join('');
+    }
     
     async loadRecordings() {
         try {
@@ -913,10 +969,9 @@ class MeetingApp {
                             📝 Download Transcript
                         </a>
                         ${file.summary_path ? 
-                            `<a href="/api/download?file=${encodeURIComponent(file.summary_path)}" 
-                                class="btn btn-small" data-open>
-                                📋 Download Summary
-                             </a>` : 
+                            `<button class="btn btn-small btn-ghost" data-summary-path="${encodeURIComponent(file.summary_path)}">
+                                👀 View Summary
+                             </button>` : 
                             '<span class="btn btn-small btn-disabled">📋 Summary Processing...</span>'
                         }
                     </div>
@@ -928,6 +983,15 @@ class MeetingApp {
     }
 
     handleRecordingOpen(event) {
+        const summaryBtn = event.target.closest('button[data-summary-path]');
+        if (summaryBtn) {
+            event.preventDefault();
+            const summaryPath = summaryBtn.getAttribute('data-summary-path');
+            if (summaryPath) {
+                this.openSummaryViewer(decodeURIComponent(summaryPath));
+            }
+            return;
+        }
         const link = event.target.closest('a[data-open]');
         if (!link) {
             return;
@@ -937,6 +1001,54 @@ class MeetingApp {
         if (openUrl) {
             window.open(openUrl, '_blank', 'noopener,noreferrer');
         }
+    }
+
+    async openSummaryViewer(summaryPath) {
+        if (!this.summaryViewer || !this.summaryViewerContent) {
+            return;
+        }
+        this.summaryViewer.classList.remove('hidden');
+        this.summaryViewer.setAttribute('aria-hidden', 'false');
+        this.summaryViewerContent.innerHTML = '<p class="loading-text">Loading summary...</p>';
+        if (this.summaryViewerTitle) {
+            this.summaryViewerTitle.textContent = 'Summary';
+        }
+        if (this.summaryViewerDownload) {
+            this.summaryViewerDownload.setAttribute('href', `/api/download?file=${encodeURIComponent(summaryPath)}`);
+        }
+
+        try {
+            const response = await fetch(`/api/download?file=${encodeURIComponent(summaryPath)}`);
+            if (!response.ok) {
+                throw new Error('Failed to load summary');
+            }
+            const text = await response.text();
+            this.summaryViewerContent.innerHTML = this.renderMarkdownBlock(text);
+        } catch (error) {
+            console.error('Error loading summary:', error);
+            this.summaryViewerContent.innerHTML = '<p class="error-text">Failed to load summary.</p>';
+        }
+    }
+
+    closeSummaryViewer() {
+        if (!this.summaryViewer) {
+            return;
+        }
+        this.summaryViewer.classList.add('hidden');
+        this.summaryViewer.setAttribute('aria-hidden', 'true');
+    }
+
+    copySummary() {
+        if (!this.summaryViewerContent) {
+            return;
+        }
+        const text = this.summaryViewerContent.textContent || '';
+        if (!text.trim()) {
+            return;
+        }
+        navigator.clipboard.writeText(text).catch((err) => {
+            console.error('Failed to copy summary:', err);
+        });
     }
 }
 
