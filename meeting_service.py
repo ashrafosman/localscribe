@@ -351,7 +351,7 @@ class MeetingService:
             meeting['status'] = 'recording'
             status_message = 'Recording started'
             if fallback_reason:
-                status_message = f"Recording started (local fallback: {fallback_reason})"
+                status_message = "Recording started (using local transcription; API unavailable)"
             self._notify_callbacks(meeting_id, 'recording', status_message)
             
             # Build whisper.cpp command - match the working implementation exactly
